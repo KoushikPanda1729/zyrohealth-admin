@@ -332,7 +332,7 @@ export default function PrescriptionRequestsPage() {
                     {q.status === 'submitted' ? (
                       <>
                         <QuoteReceipt
-                          tenantName={selected.tenantName || 'HealthPlus'}
+                          tenantName={selected.tenantName || 'ZyroHealth'}
                           shopName={q.shopName}
                           requestId={q.requestId}
                           quoteDate={q.submittedAt}

@@ -381,7 +381,7 @@ export default function AIDoctorsPage() {
           >
             <TextArea
               rows={10}
-              placeholder={`You are Dr. Aria, a compassionate and knowledgeable General Physician AI assistant for HealthPlus, a telemedicine platform. Your role is to:
+              placeholder={`You are Dr. Aria, a compassionate and knowledgeable General Physician AI assistant for ZyroHealth, a telemedicine platform. Your role is to:
 1. Listen carefully to patient symptoms and concerns
 2. Ask relevant follow-up questions to better understand the condition
 3. Provide general health guidance and information

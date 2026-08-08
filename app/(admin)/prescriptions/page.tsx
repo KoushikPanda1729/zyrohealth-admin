@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   Table, Typography, Alert, Spin, Tag, Tooltip, Button, Modal, message, Divider, Space,
 } from 'antd';
-import { FilePdfOutlined, EyeOutlined, MedicineBoxOutlined, ExperimentOutlined, PlusSquareOutlined } from '@ant-design/icons';
+import { FilePdfOutlined, EyeOutlined, MedicineBoxOutlined, ExperimentOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { apiCall } from '../../../lib/api';
 import type { TablePaginationConfig } from 'antd';
@@ -49,12 +49,10 @@ function PrescriptionPad({ rx }: { rx: Prescription }) {
     <div style={{ background: '#fff', borderRadius: 8, padding: 24 }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', paddingBottom: 14, borderBottom: `3px solid ${TEAL}`, marginBottom: 14 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 42, height: 42, borderRadius: '50%', background: TEAL, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <PlusSquareOutlined style={{ color: '#fff', fontSize: 20 }} />
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 16, color: '#111' }}>HealthPlus</div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-full.png" alt="ZyroHealth" style={{ height: 26, width: 'auto', display: 'block', marginBottom: 4 }} />
             <div style={{ fontSize: 11, color: '#64748b' }}>Digital Health Platform</div>
           </div>
         </div>

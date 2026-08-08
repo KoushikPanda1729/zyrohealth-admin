@@ -98,16 +98,14 @@ function LoginForm() {
         />
 
         <div style={{ position: 'relative', zIndex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 40 }}>
-            <div
-              style={{
-                width: 40, height: 40, background: 'rgba(255,255,255,0.15)', borderRadius: 10,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)',
-              }}
-            >
-              <Text style={{ color: '#fff', fontSize: 20, fontWeight: 700 }}>F</Text>
-            </div>
-            <Text style={{ color: '#fff', fontSize: 18, fontWeight: 600 }}>HealthPlus</Text>
+          <div
+            style={{
+              display: 'inline-flex', alignItems: 'center', background: '#fff',
+              borderRadius: 10, padding: '8px 14px', marginBottom: 40,
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-full.png" alt="ZyroHealth" style={{ height: 24, width: 'auto', display: 'block' }} />
           </div>
 
           <Title level={1} style={{ color: '#fff', fontSize: 34, lineHeight: 1.25, marginBottom: 12 }}>
@@ -231,11 +229,15 @@ function LoginForm() {
 
         <div style={{ width: '100%', maxWidth: 380 }}>
           {/* Compact brand mark shown only when the left panel is hidden (narrow screens) */}
-          <div className="login-mobile-brand" style={{ display: 'none', alignItems: 'center', gap: 10, marginBottom: 40 }}>
-            <div style={{ width: 36, height: 36, background: '#1677ff', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>F</Text>
-            </div>
-            <Text strong style={{ fontSize: 16 }}>HealthPlus</Text>
+          <div
+            className="login-mobile-brand"
+            style={{
+              display: 'none', alignItems: 'center', marginBottom: 40,
+              background: '#fff', borderRadius: 10, padding: '8px 14px', alignSelf: 'flex-start',
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-full.png" alt="ZyroHealth" style={{ height: 22, width: 'auto', display: 'block' }} />
           </div>
 
           <Title level={2} style={{ marginBottom: 6 }}>Welcome back</Title>

@@ -278,7 +278,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     router.push(key);
   };
 
-  const currentTitle = pageTitles[pathname] || 'HealthPlus Admin';
+  const currentTitle = pageTitles[pathname] || 'ZyroHealth Admin';
 
   // Tenant nav is grouped into labeled sections for readability; super
   // admin's short 2-item nav stays flat.
@@ -359,32 +359,36 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               borderBottom: '1px solid rgba(255,255,255,0.1)',
             }}
           >
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                background: '#1677ff',
-                borderRadius: 8,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <Text style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>F</Text>
-            </div>
-            {!collapsed && (
-              <Text
+            {collapsed ? (
+              <div
                 style={{
-                  color: '#fff',
-                  fontSize: 16,
-                  fontWeight: 700,
-                  marginLeft: 10,
-                  whiteSpace: 'nowrap',
+                  width: 32,
+                  height: 32,
+                  background: '#fff',
+                  borderRadius: 8,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  padding: 4,
                 }}
               >
-                HealthPlus
-              </Text>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/logo-icon.png" alt="ZyroHealth" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              </div>
+            ) : (
+              <div
+                style={{
+                  background: '#fff',
+                  borderRadius: 8,
+                  padding: '6px 10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/logo-full.png" alt="ZyroHealth" style={{ height: 18, width: 'auto', display: 'block' }} />
+              </div>
             )}
           </div>
 

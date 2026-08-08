@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { useThemeMode } from '../theme-context';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 export default function ShopLoginPage() {
   const router = useRouter();
@@ -66,15 +66,8 @@ export default function ShopLoginPage() {
       />
       <Card style={{ width: 420, boxShadow: '0 8px 32px rgba(22, 119, 255, 0.12)', borderRadius: 16 }}>
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div
-            style={{
-              width: 56, height: 56, background: '#1677ff', borderRadius: 14,
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16,
-            }}
-          >
-            <Text style={{ color: '#fff', fontSize: 24, fontWeight: 700 }}>F</Text>
-          </div>
-          <Title level={2} style={{ marginBottom: 4, color: '#1677ff' }}>HealthPlus</Title>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-full.png" alt="ZyroHealth" style={{ height: 34, width: 'auto', display: 'block', margin: '0 auto 16px' }} />
           <Text type="secondary">Medicine Shop Portal — Sign In</Text>
         </div>
 
