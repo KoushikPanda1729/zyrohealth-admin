@@ -279,7 +279,7 @@ export default function WhatsAppPage() {
         title={<span><WhatsAppOutlined style={{ marginRight: 8, color: '#25D366' }} />{selected?.user?.fullName || selected?.phoneNumber}</span>}
         open={!!selected}
         onClose={() => setSelected(null)}
-        width={480}
+        size={480}
         destroyOnClose
         styles={{ body: { display: 'flex', flexDirection: 'column', padding: 16, height: '100%' } }}
         extra={

@@ -797,7 +797,7 @@ export default function DoctorsPage() {
         placement="right"
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        width={620}
+        size={620}
         destroyOnClose
         footer={
           createStep < 3 ? (

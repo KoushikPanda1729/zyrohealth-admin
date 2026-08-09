@@ -493,7 +493,7 @@ export default function PurchaseOrdersPage() {
         placement="right"
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        width={520}
+        size={520}
         destroyOnClose
         footer={
           <Space style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
@@ -582,7 +582,7 @@ export default function PurchaseOrdersPage() {
         placement="right"
         open={suppliersOpen}
         onClose={() => setSuppliersOpen(false)}
-        width={420}
+        size={420}
         destroyOnClose
       >
         <Form form={supplierForm} layout="vertical" onFinish={addSupplier} style={{ marginBottom: 16 }}>
@@ -646,7 +646,7 @@ export default function PurchaseOrdersPage() {
         placement="right"
         open={!!viewingOrder}
         onClose={() => setViewingOrder(null)}
-        width={480}
+        size={480}
       >
         {viewingOrder && (
           <Space direction="vertical" style={{ width: '100%' }} size="large">
@@ -728,7 +728,7 @@ export default function PurchaseOrdersPage() {
         placement="right"
         open={suggestionsOpen}
         onClose={() => setSuggestionsOpen(false)}
-        width={480}
+        size={480}
       >
         <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 16 }}>
           Computed from your own Billing sales history — a new medicine or a shop that hasn&apos;t used Billing

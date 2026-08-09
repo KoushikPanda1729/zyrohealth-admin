@@ -80,14 +80,14 @@ export default function ShopDashboardPage() {
                 <Statistic
                   title="Awaiting Your Quote"
                   value={pending.length}
-                  valueStyle={{ color: pending.length > 0 ? '#faad14' : undefined }}
+                  styles={{ content: { color: pending.length > 0 ? '#faad14' : undefined } }}
                   prefix={<ClockCircleOutlined />}
                 />
               </Card>
             </Col>
             <Col xs={24} sm={12} lg={6}>
               <Card size="small">
-                <Statistic title="Quotes Submitted" value={submitted.length} prefix={<CheckCircleOutlined />} valueStyle={{ color: '#3f8600' }} />
+                <Statistic title="Quotes Submitted" value={submitted.length} prefix={<CheckCircleOutlined />} styles={{ content: { color: '#3f8600' } }} />
               </Card>
             </Col>
             <Col xs={24} sm={12} lg={6}>

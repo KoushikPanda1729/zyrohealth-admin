@@ -338,7 +338,7 @@ export default function TenantsPage() {
         placement="right"
         open={creating}
         onClose={() => setCreating(false)}
-        width={480}
+        size={480}
         destroyOnClose
         footer={
           <Space style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
@@ -422,7 +422,7 @@ export default function TenantsPage() {
         placement="right"
         open={!!editingEntitlements}
         onClose={() => setEditingEntitlements(null)}
-        width={480}
+        size={480}
         destroyOnClose
         footer={
           <Space style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>

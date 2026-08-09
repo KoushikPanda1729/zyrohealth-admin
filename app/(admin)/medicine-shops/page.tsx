@@ -365,7 +365,7 @@ export default function MedicineShopsPage() {
         placement="right"
         open={drawerOpen}
         onClose={closeDrawer}
-        width={420}
+        size={420}
         destroyOnClose
         footer={
           <Space style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
@@ -432,7 +432,7 @@ export default function MedicineShopsPage() {
         placement="right"
         open={!!invitingShop}
         onClose={() => setInvitingShop(null)}
-        width={420}
+        size={420}
         destroyOnClose
         footer={
           <Space style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
@@ -480,7 +480,7 @@ export default function MedicineShopsPage() {
         placement="right"
         open={!!catalogShop}
         onClose={() => setCatalogShop(null)}
-        width={460}
+        size={460}
         destroyOnClose
       >
         <Space.Compact style={{ width: '100%', marginBottom: 12 }}>

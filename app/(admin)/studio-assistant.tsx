@@ -323,7 +323,7 @@ export default function StudioAssistant() {
         placement="right"
         open={open}
         onClose={() => setOpen(false)}
-        width={420}
+        size={420}
         styles={{ body: { display: 'flex', flexDirection: 'column', padding: 0 } }}
         extra={
           <div style={{ display: 'flex', gap: 4 }}>

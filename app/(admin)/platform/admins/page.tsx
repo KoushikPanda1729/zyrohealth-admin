@@ -200,7 +200,7 @@ export default function TenantAdminsPage() {
         placement="right"
         open={creating}
         onClose={() => setCreating(false)}
-        width={420}
+        size={420}
         destroyOnClose
         footer={
           <Space style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>

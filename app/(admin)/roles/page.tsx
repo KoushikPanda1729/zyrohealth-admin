@@ -288,7 +288,7 @@ export default function RolesPage() {
         placement="right"
         open={inviting}
         onClose={() => setInviting(false)}
-        width={420}
+        size={420}
         destroyOnClose
         footer={
           <Space style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>

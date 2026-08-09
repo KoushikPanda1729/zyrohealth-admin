@@ -370,7 +370,7 @@ export default function PlatformMedicineShopsPage() {
         placement="right"
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        width={440}
+        size={440}
         destroyOnClose
         footer={
           <Space style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
@@ -487,7 +487,7 @@ export default function PlatformMedicineShopsPage() {
         placement="right"
         open={!!editingEntitlements}
         onClose={() => setEditingEntitlements(null)}
-        width={480}
+        size={480}
         destroyOnClose
         footer={
           <Space style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
@@ -515,7 +515,7 @@ export default function PlatformMedicineShopsPage() {
         placement="right"
         open={!!invitingAdminFor}
         onClose={() => setInvitingAdminFor(null)}
-        width={420}
+        size={420}
         destroyOnClose
         footer={
           <Space style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>

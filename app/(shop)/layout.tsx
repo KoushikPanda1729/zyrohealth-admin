@@ -15,17 +15,18 @@ import { useThemeMode } from '../theme-context';
 const { Sider, Header, Content } = Layout;
 const { Text } = Typography;
 
-// Purchase Orders and Staff are owner-only areas — a cashier (see
-// requireShopOwner.middleware.ts on the backend) can still bill and view
-// the catalog, but restocking decisions and who else gets a shop login
-// are the owner's call.
+// Purchase Orders is owner-only — restocking decisions are the owner's
+// call. Staff is NOT owner-only anymore: it's every shop user's own
+// self-service hub too (check in/out, request leave, see your own
+// payslips) — the page itself hides the owner-only tabs (Roles, staff
+// administration) from non-owners, see app/(shop)/staff/page.tsx.
 const MENU_ITEMS = [
   { key: '/shop-dashboard', icon: <DashboardOutlined />, label: 'Dashboard', ownerOnly: false },
   { key: '/requests', icon: <ScanOutlined />, label: 'Prescription Requests', ownerOnly: false },
   { key: '/catalog', icon: <MedicineBoxOutlined />, label: 'Medicine List', ownerOnly: false },
   { key: '/purchase-orders', icon: <ShoppingCartOutlined />, label: 'Purchase Orders', ownerOnly: true },
   { key: '/billing', icon: <FileTextOutlined />, label: 'Billing', ownerOnly: false },
-  { key: '/staff', icon: <TeamOutlined />, label: 'Staff', ownerOnly: true },
+  { key: '/staff', icon: <TeamOutlined />, label: 'Staff', ownerOnly: false },
 ];
 
 function ShopLayoutInner({ children }: { children: React.ReactNode }) {

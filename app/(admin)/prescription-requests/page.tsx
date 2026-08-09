@@ -255,7 +255,7 @@ export default function PrescriptionRequestsPage() {
         placement="right"
         open={!!selected}
         onClose={() => setSelected(null)}
-        width={560}
+        size={560}
       >
         {drawerLoading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><Spin size="large" /></div>

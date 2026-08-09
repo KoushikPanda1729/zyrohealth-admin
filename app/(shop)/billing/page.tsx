@@ -820,7 +820,7 @@ export default function BillingPage() {
         placement="right"
         open={!!ledgerFor}
         onClose={() => setLedgerFor(null)}
-        width={420}
+        size={420}
       >
         {ledgerFor && (
           <>

@@ -635,7 +635,7 @@ export default function ShopCatalogPage() {
         placement="right"
         open={drawerOpen}
         onClose={closeDrawer}
-        width={420}
+        size={420}
         destroyOnClose
         footer={
           <Space style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
@@ -811,7 +811,7 @@ export default function ShopCatalogPage() {
         placement="right"
         open={historyModalOpen}
         onClose={() => setHistoryModalOpen(false)}
-        width={440}
+        size={440}
         extra={
           <Button size="small" icon={<DownloadOutlined />} onClick={() => { setHistoryRange(null); setHistoryDownloadOpen(true); }}>
             Download
@@ -973,7 +973,7 @@ export default function ShopCatalogPage() {
         placement="right"
         open={!!batchesFor}
         onClose={closeBatches}
-        width={420}
+        size={420}
         destroyOnClose
       >
         <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 16 }}>

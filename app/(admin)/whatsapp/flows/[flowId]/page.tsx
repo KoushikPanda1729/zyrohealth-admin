@@ -342,7 +342,7 @@ export default function FlowEditorPage() {
         title={selectedNode ? `Edit: ${NODE_META[selectedNode.data.nodeType].label}` : ''}
         open={!!selectedNode}
         onClose={() => setSelectedNodeId(null)}
-        width={380}
+        size={380}
         extra={
           selectedNode && selectedNode.data.nodeType !== 'start' && (
             <Popconfirm title="Delete this node?" onConfirm={deleteSelectedNode} okText="Delete" okButtonProps={{ danger: true }}>

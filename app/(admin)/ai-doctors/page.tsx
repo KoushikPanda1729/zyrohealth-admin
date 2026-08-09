@@ -320,7 +320,7 @@ export default function AIDoctorsPage() {
           setModalOpen(false);
           form.resetFields();
         }}
-        width={520}
+        size={520}
         destroyOnClose
         footer={
           <Space style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
