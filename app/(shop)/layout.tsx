@@ -6,6 +6,7 @@ import type { MenuProps } from 'antd';
 import {
   LogoutOutlined, MoonOutlined, SunOutlined, ShopOutlined, DashboardOutlined,
   ScanOutlined, MedicineBoxOutlined, ApartmentOutlined, ShoppingCartOutlined, FileTextOutlined, TeamOutlined,
+  WhatsAppOutlined, CarOutlined,
 } from '@ant-design/icons';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { apiCall } from '../../lib/api';
@@ -23,10 +24,12 @@ const { Text } = Typography;
 const MENU_ITEMS = [
   { key: '/shop-dashboard', icon: <DashboardOutlined />, label: 'Dashboard', ownerOnly: false },
   { key: '/requests', icon: <ScanOutlined />, label: 'Prescription Requests', ownerOnly: false },
+  { key: '/orders', icon: <CarOutlined />, label: 'Orders', ownerOnly: false },
   { key: '/catalog', icon: <MedicineBoxOutlined />, label: 'Medicine List', ownerOnly: false },
   { key: '/purchase-orders', icon: <ShoppingCartOutlined />, label: 'Purchase Orders', ownerOnly: true },
   { key: '/billing', icon: <FileTextOutlined />, label: 'Billing', ownerOnly: false },
   { key: '/staff', icon: <TeamOutlined />, label: 'Staff', ownerOnly: false },
+  { key: '/shop-whatsapp', icon: <WhatsAppOutlined />, label: 'WhatsApp', ownerOnly: false },
 ];
 
 function ShopLayoutInner({ children }: { children: React.ReactNode }) {

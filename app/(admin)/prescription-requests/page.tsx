@@ -5,7 +5,9 @@ import {
   Table, Typography, Alert, Spin, Tag, Button, Space, message, Drawer, Select, Image, Switch,
   Descriptions, Empty, Popconfirm,
 } from 'antd';
-import { ScanOutlined, SendOutlined, CheckCircleOutlined, UnorderedListOutlined } from '@ant-design/icons';
+import {
+  ScanOutlined, SendOutlined, CheckCircleOutlined, UnorderedListOutlined, DollarOutlined, NotificationOutlined,
+} from '@ant-design/icons';
 import axios from 'axios';
 import { apiCall } from '../../../lib/api';
 import QuoteReceipt from '../../components/QuoteReceipt';
@@ -37,7 +39,7 @@ interface QuoteRow {
   requestId: string;
   shopId: string;
   shopName?: string;
-  status: 'pending' | 'submitted' | 'declined';
+  status: 'pending' | 'submitted' | 'declined' | 'not_selected';
   items?: QuoteItem[];
   totalCents?: number;
   note?: string;
@@ -46,6 +48,21 @@ interface QuoteRow {
 }
 
 interface MedicineShopOption { id: string; name: string; isActive: boolean; }
+
+interface OrderDetail {
+  id: string;
+  totalCents: number;
+  paymentStatus: 'unpaid' | 'pending' | 'paid' | 'failed' | 'refunded';
+  shopNotifiedAt?: string;
+}
+
+const paymentStatusColor: Record<OrderDetail['paymentStatus'], string> = {
+  unpaid: 'default',
+  pending: 'gold',
+  paid: 'green',
+  failed: 'red',
+  refunded: 'purple',
+};
 
 const statusColor: Record<string, string> = {
   pending_dispatch: 'default',
@@ -74,6 +91,8 @@ export default function PrescriptionRequestsPage() {
   const [selectingQuoteId, setSelectingQuoteId] = useState<string | null>(null);
   const [lettingChoose, setLettingChoose] = useState(false);
   const [manualSavingId, setManualSavingId] = useState<string | null>(null);
+  const [orderDetail, setOrderDetail] = useState<OrderDetail | null>(null);
+  const [notifying, setNotifying] = useState(false);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -112,15 +131,39 @@ export default function PrescriptionRequestsPage() {
     try {
       const result = await apiCall('GET', `/api/admin/prescription-requests/${id}`);
       const detail = result.data ?? result;
-      setSelected(detail.request);
+      const request: PrescriptionRequestRow = detail.request;
+      setSelected(request);
       setQuotes(detail.quotes ?? []);
+
+      if (request.resultingOrderId) {
+        try {
+          const orderResult = await apiCall('GET', `/api/admin/medicine-orders/${request.resultingOrderId}`);
+          setOrderDetail(orderResult.data ?? orderResult);
+        } catch { setOrderDetail(null); }
+      } else {
+        setOrderDetail(null);
+      }
     } catch { /* keep stale */ }
+  };
+
+  const notifyShop = async () => {
+    if (!orderDetail) return;
+    setNotifying(true);
+    try {
+      const result = await apiCall('POST', `/api/admin/medicine-orders/${orderDetail.id}/notify-shop`);
+      setOrderDetail(result.data ?? result);
+      message.success('Pharmacy notified to deliver');
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) message.error(err.response?.data?.message || 'Failed to notify pharmacy');
+      else message.error('An unexpected error occurred');
+    } finally { setNotifying(false); }
   };
 
   const openDetail = async (row: PrescriptionRequestRow) => {
     setSelected(row);
     setDrawerLoading(true);
     setDispatchShopIds([]);
+    setOrderDetail(null);
     try {
       await refreshDetail(row.id);
     } catch {
@@ -272,6 +315,39 @@ export default function PrescriptionRequestsPage() {
             <Text strong style={{ display: 'block', marginBottom: 8 }}>Prescription Photo</Text>
             <Image src={selected.imageUrl} alt="Prescription" style={{ maxWidth: '100%', borderRadius: 8, marginBottom: 20 }} />
 
+            {orderDetail && (
+              <>
+                <Text strong style={{ display: 'block', marginBottom: 8 }}>Order & Payment</Text>
+                <div style={{ border: '1px solid rgba(128,128,128,0.3)', borderRadius: 8, padding: 12, marginBottom: 20 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: orderDetail.paymentStatus === 'paid' ? 10 : 0 }}>
+                    <Text>
+                      <DollarOutlined style={{ marginRight: 6 }} />
+                      ₹{(orderDetail.totalCents / 100).toFixed(2)}
+                    </Text>
+                    <Tag color={paymentStatusColor[orderDetail.paymentStatus]}>
+                      {orderDetail.paymentStatus.toUpperCase()}
+                    </Tag>
+                  </div>
+                  {orderDetail.paymentStatus === 'paid' && (
+                    <Button
+                      block
+                      icon={<NotificationOutlined />}
+                      loading={notifying}
+                      disabled={!!orderDetail.shopNotifiedAt}
+                      onClick={notifyShop}
+                    >
+                      {orderDetail.shopNotifiedAt ? 'Pharmacy Notified' : 'Notify Shop to Deliver'}
+                    </Button>
+                  )}
+                  {orderDetail.paymentStatus !== 'paid' && (
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Waiting for the patient to complete payment before the pharmacy can be notified.
+                    </Text>
+                  )}
+                </div>
+              </>
+            )}
+
             <Text strong style={{ display: 'block', marginBottom: 8 }}>Dispatch to Shops</Text>
             {availableToDispatch.length === 0 ? (
               <Empty description="All active shops have already been dispatched" style={{ marginBottom: 20 }} />
@@ -367,6 +443,16 @@ export default function PrescriptionRequestsPage() {
                           <Text strong>{q.shopName || 'Unknown shop'}</Text>
                           <Tag color="red">DECLINED</Tag>
                         </div>
+                      </div>
+                    ) : q.status === 'not_selected' ? (
+                      <div style={{ border: '1px solid rgba(128,128,128,0.3)', borderRadius: 8, padding: 12 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text strong>{q.shopName || 'Unknown shop'}</Text>
+                          <Tag>NOT SELECTED</Tag>
+                        </div>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          Quoted ₹{((q.totalCents ?? 0) / 100).toFixed(2)} — another shop was chosen instead.
+                        </Text>
                       </div>
                     ) : (
                       <div style={{ border: '1px solid rgba(128,128,128,0.3)', borderRadius: 8, padding: 12 }}>

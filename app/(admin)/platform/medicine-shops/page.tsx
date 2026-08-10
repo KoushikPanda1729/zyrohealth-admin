@@ -6,7 +6,7 @@ import {
 } from 'antd';
 import {
   ShopOutlined, LoginOutlined, PlusOutlined, PhoneOutlined, MailOutlined, EnvironmentOutlined, UserOutlined,
-  LockOutlined, CheckCircleFilled, CopyOutlined, SafetyCertificateOutlined, TeamOutlined,
+  LockOutlined, CheckCircleFilled, CopyOutlined, SafetyCertificateOutlined, TeamOutlined, GlobalOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
@@ -24,6 +24,8 @@ interface MedicineShopRow {
   city?: string;
   isActive: boolean;
   whatsappLinked: boolean;
+  whatsappModuleEnabled: boolean;
+  whatsappModuleFromNumber?: string;
   ownershipType: 'in_house' | 'third_party';
   isStandaloneMedicineShop?: boolean;
   createdAt: string;
@@ -80,6 +82,11 @@ export default function PlatformMedicineShopsPage() {
   const [editingEntitlements, setEditingEntitlements] = useState<MedicineShopRow | null>(null);
   const [entitlementModules, setEntitlementModules] = useState<string[]>([]);
   const [entitlementsSaving, setEntitlementsSaving] = useState(false);
+
+  const [waModuleShop, setWaModuleShop] = useState<MedicineShopRow | null>(null);
+  const [waModuleEnabled, setWaModuleEnabled] = useState(false);
+  const [waModuleNumber, setWaModuleNumber] = useState('');
+  const [waModuleSaving, setWaModuleSaving] = useState(false);
 
   const [invitingAdminFor, setInvitingAdminFor] = useState<MedicineShopRow | null>(null);
   const [inviteAdminForm] = Form.useForm<{ fullName: string; email: string; password?: string }>();
@@ -266,6 +273,29 @@ export default function PlatformMedicineShopsPage() {
     } finally { setEntitlementsSaving(false); }
   };
 
+  const openWaModule = (shop: MedicineShopRow) => {
+    setWaModuleShop(shop);
+    setWaModuleEnabled(shop.whatsappModuleEnabled);
+    setWaModuleNumber(shop.whatsappModuleFromNumber ?? '');
+  };
+
+  const saveWaModule = async () => {
+    if (!waModuleShop) return;
+    setWaModuleSaving(true);
+    try {
+      await apiCall('PATCH', `/api/platform/medicine-shops/${waModuleShop.id}/whatsapp-module`, {
+        enabled: waModuleEnabled,
+        fromNumber: waModuleNumber.trim() || undefined,
+      });
+      message.success(waModuleEnabled ? 'WhatsApp module enabled' : 'WhatsApp module disabled');
+      setWaModuleShop(null);
+      fetchAll();
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) message.error(err.response?.data?.message || 'Failed to update WhatsApp module');
+      else message.error('An unexpected error occurred');
+    } finally { setWaModuleSaving(false); }
+  };
+
   const columns = [
     { title: 'Shop', dataIndex: 'name', key: 'name' },
     { title: 'Tenant', dataIndex: 'tenantName', key: 'tenantName', render: (v?: string) => v || '—' },
@@ -290,6 +320,12 @@ export default function PlatformMedicineShopsPage() {
       ),
     },
     {
+      title: 'WA Module', key: 'whatsappModuleEnabled',
+      render: (_: unknown, s: MedicineShopRow) => (
+        s.whatsappModuleEnabled ? <Tag color="green">Enabled</Tag> : <Tag>Off</Tag>
+      ),
+    },
+    {
       title: 'Created', dataIndex: 'createdAt', key: 'createdAt',
       render: (v: string) => new Date(v).toLocaleDateString('en-IN', { dateStyle: 'medium' }),
     },
@@ -305,6 +341,9 @@ export default function PlatformMedicineShopsPage() {
                 </Button>
                 <Button size="small" icon={<TeamOutlined />} onClick={() => openInviteAdmin(s)}>
                   Invite Admin Login
+                </Button>
+                <Button size="small" icon={<GlobalOutlined />} onClick={() => openWaModule(s)}>
+                  WA Module
                 </Button>
               </>
             )}
@@ -480,6 +519,40 @@ export default function PlatformMedicineShopsPage() {
             )}
           </Space>
         )}
+      </Modal>
+
+      <Modal
+        title={<span><GlobalOutlined style={{ marginRight: 8 }} />WhatsApp Module — {waModuleShop?.name ?? ''}</span>}
+        open={!!waModuleShop}
+        onCancel={() => setWaModuleShop(null)}
+        onOk={saveWaModule}
+        okText="Save"
+        confirmLoading={waModuleSaving}
+      >
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Grants this shop its own independent WhatsApp Business presence — a dedicated number their customers
+            message directly, with their own provider account and flow builder, separate from the regular
+            shop-quotes-a-tenant&apos;s-prescription-requests relationship.
+          </Text>
+          <Checkbox checked={waModuleEnabled} onChange={(e) => setWaModuleEnabled(e.target.checked)}>
+            Enabled
+          </Checkbox>
+          <div>
+            <Text strong style={{ fontSize: 13 }}>Registered number (for routing)</Text>
+            <Input
+              value={waModuleNumber}
+              onChange={(e) => setWaModuleNumber(e.target.value)}
+              placeholder="+919876543210"
+              style={{ marginTop: 4 }}
+            />
+            <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 4 }}>
+              The real phone number the shop&apos;s own module will run on — used only to route incoming webhook
+              messages to this shop instead of a tenant. The shop still needs to enter their own Twilio/Meta
+              credentials in their own portal before the number actually works.
+            </Text>
+          </div>
+        </Space>
       </Modal>
 
       <Drawer
