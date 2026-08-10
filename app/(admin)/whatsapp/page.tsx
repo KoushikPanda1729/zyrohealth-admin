@@ -73,7 +73,7 @@ export default function WhatsAppPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
-  const [provider, setProvider] = useState<'twilio' | 'meta'>('twilio');
+  const [provider, setProvider] = useState<'twilio' | 'meta' | 'gupshup'>('twilio');
   const [twilioAccountSid, setTwilioAccountSid] = useState('');
   const [twilioAuthToken, setTwilioAuthToken] = useState('');
   const [twilioFromNumber, setTwilioFromNumber] = useState('');
@@ -84,6 +84,12 @@ export default function WhatsAppPage() {
   const [metaApiVersion, setMetaApiVersion] = useState('');
   const [hasMetaAccessToken, setHasMetaAccessToken] = useState(false);
   const [hasMetaAppSecret, setHasMetaAppSecret] = useState(false);
+  const [gupshupApiKey, setGupshupApiKey] = useState('');
+  const [gupshupSourceNumber, setGupshupSourceNumber] = useState('');
+  const [gupshupAppName, setGupshupAppName] = useState('');
+  const [gupshupWebhookSecret, setGupshupWebhookSecret] = useState('');
+  const [hasGupshupApiKey, setHasGupshupApiKey] = useState(false);
+  const [hasGupshupWebhookSecret, setHasGupshupWebhookSecret] = useState(false);
   const [usingPlatformDefault, setUsingPlatformDefault] = useState(false);
 
   const fetchSessions = useCallback(async (page = 1) => {
@@ -163,6 +169,12 @@ export default function WhatsAppPage() {
       setHasMetaAppSecret(!!cfg.hasMetaAppSecret);
       setMetaAccessToken('');
       setMetaAppSecret('');
+      setGupshupSourceNumber(cfg.gupshupSourceNumber ?? '');
+      setGupshupAppName(cfg.gupshupAppName ?? '');
+      setHasGupshupApiKey(!!cfg.hasGupshupApiKey);
+      setHasGupshupWebhookSecret(!!cfg.hasGupshupWebhookSecret);
+      setGupshupApiKey('');
+      setGupshupWebhookSecret('');
       setUsingPlatformDefault(!!cfg.usingPlatformDefault);
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) message.error(err.response?.data?.message || 'Failed to load WhatsApp settings');
@@ -182,6 +194,10 @@ export default function WhatsAppPage() {
         metaAccessToken: metaAccessToken.trim() || undefined,
         metaAppSecret: metaAppSecret.trim() || undefined,
         metaApiVersion: metaApiVersion.trim() || undefined,
+        gupshupApiKey: gupshupApiKey.trim() || undefined,
+        gupshupSourceNumber: gupshupSourceNumber.trim() || undefined,
+        gupshupAppName: gupshupAppName.trim() || undefined,
+        gupshupWebhookSecret: gupshupWebhookSecret.trim() || undefined,
       });
       message.success('WhatsApp settings saved');
       setSettingsOpen(false);
@@ -375,6 +391,7 @@ export default function WhatsAppPage() {
                 <Radio.Group value={provider} onChange={(e) => setProvider(e.target.value)}>
                   <Radio.Button value="twilio">Twilio</Radio.Button>
                   <Radio.Button value="meta">Meta Cloud API</Radio.Button>
+                  <Radio.Button value="gupshup">Gupshup</Radio.Button>
                 </Radio.Group>
               </div>
             </div>
@@ -456,6 +473,59 @@ export default function WhatsAppPage() {
                     placeholder="v21.0"
                     style={{ marginTop: 4 }}
                   />
+                </div>
+              </>
+            )}
+
+            {provider === 'gupshup' && (
+              <>
+                <div>
+                  <Text strong style={{ fontSize: 13 }}>App Name</Text>
+                  <Input
+                    value={gupshupAppName}
+                    onChange={(e) => setGupshupAppName(e.target.value)}
+                    placeholder="Your Gupshup app name"
+                    style={{ marginTop: 4 }}
+                  />
+                  <Text type="secondary" style={{ fontSize: 11 }}>
+                    Used to route inbound messages to this tenant — Gupshup&apos;s webhook has no receiving phone
+                    number field, only the app name.
+                  </Text>
+                </div>
+                <div>
+                  <Text strong style={{ fontSize: 13 }}>Source Number</Text>
+                  <Input
+                    value={gupshupSourceNumber}
+                    onChange={(e) => setGupshupSourceNumber(e.target.value)}
+                    placeholder="919000000000"
+                    style={{ marginTop: 4 }}
+                  />
+                </div>
+                <div>
+                  <Text strong style={{ fontSize: 13 }}><LockOutlined style={{ marginRight: 4 }} />API Key</Text>
+                  <Input.Password
+                    value={gupshupApiKey}
+                    onChange={(e) => setGupshupApiKey(e.target.value)}
+                    placeholder={secretPlaceholder(hasGupshupApiKey, usingPlatformDefault, 'API key')}
+                    style={{ marginTop: 4 }}
+                  />
+                  <Text type="secondary" style={{ fontSize: 11 }}>
+                    Stored encrypted — never shown again once saved. Leave blank to keep the current one.
+                  </Text>
+                </div>
+                <div>
+                  <Text strong style={{ fontSize: 13 }}><LockOutlined style={{ marginRight: 4 }} />Webhook Secret</Text>
+                  <Input.Password
+                    value={gupshupWebhookSecret}
+                    onChange={(e) => setGupshupWebhookSecret(e.target.value)}
+                    placeholder={secretPlaceholder(hasGupshupWebhookSecret, usingPlatformDefault, 'webhook secret')}
+                    style={{ marginTop: 4 }}
+                  />
+                  <Text type="secondary" style={{ fontSize: 11 }}>
+                    Gupshup has no built-in webhook signature — this is your own chosen value, embedded as
+                    <Text code style={{ fontSize: 11 }}> /api/whatsapp/webhook/gupshup/&lt;this-value&gt;</Text> when
+                    you register the callback URL in Gupshup&apos;s console.
+                  </Text>
                 </div>
               </>
             )}

@@ -11,6 +11,7 @@ import {
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
 import { apiCall } from '../../../lib/api';
+import { useThemeMode } from '../../theme-context';
 
 const { Title, Text } = Typography;
 
@@ -24,16 +25,40 @@ interface WhatsAppMessageEvent {
   timestamp: string;
 }
 
-// Built from theme tokens (not hardcoded hex) so bubbles stay legible in
-// both light and dark mode — same approach as the tenant-side WhatsApp
-// sessions drawer (app/(admin)/whatsapp/page.tsx).
+// Mimics the real WhatsApp app's look: "user" and "admin" are both this
+// shop's own outgoing messages (typed on the phone, or a manual portal
+// reply) so they render on the right in WhatsApp's green; "assistant" is
+// the bot on the other end, rendered on the left in white/grey — the same
+// convention as opening your own WhatsApp chat with a business.
+function getWaTheme(isDark: boolean) {
+  return isDark
+    ? {
+        wallpaper: '#0b141a',
+        dot: 'rgba(255,255,255,0.05)',
+        outgoingBg: '#005c4b',
+        incomingBg: '#202c33',
+        textColor: '#e9edef',
+        timeColor: 'rgba(233,237,239,0.6)',
+        labelColor: 'rgba(233,237,239,0.55)',
+      }
+    : {
+        wallpaper: '#e5ddd5',
+        dot: 'rgba(0,0,0,0.045)',
+        outgoingBg: '#d9fdd3',
+        incomingBg: '#ffffff',
+        textColor: '#111b21',
+        timeColor: 'rgba(17,27,33,0.5)',
+        labelColor: 'rgba(17,27,33,0.45)',
+      };
+}
+
 function getRoleStyles(
-  token: ReturnType<typeof theme.useToken>['token'],
+  waTheme: ReturnType<typeof getWaTheme>,
 ): Record<WhatsAppMessageEvent['role'], { align: 'flex-start' | 'flex-end'; bg: string; label: string }> {
   return {
-    user: { align: 'flex-start', bg: token.colorFillTertiary, label: 'Sent from your phone' },
-    assistant: { align: 'flex-end', bg: token.colorInfoBg, label: '🤖 Bot' },
-    admin: { align: 'flex-end', bg: token.colorSuccessBg, label: '👤 Admin' },
+    user: { align: 'flex-end', bg: waTheme.outgoingBg, label: 'Sent from your phone' },
+    admin: { align: 'flex-end', bg: waTheme.outgoingBg, label: '👤 Admin (manual reply)' },
+    assistant: { align: 'flex-start', bg: waTheme.incomingBg, label: '🤖 Bot' },
   };
 }
 
@@ -87,7 +112,9 @@ export default function ShopWhatsAppPage() {
 // ════════════════════════════════════════════════════════════════════════
 function QuoteRequestsTab({ me }: { me: { isOwner: boolean } }) {
   const { token } = theme.useToken();
-  const roleStyles = getRoleStyles(token);
+  const { isDark } = useThemeMode();
+  const waTheme = getWaTheme(isDark);
+  const roleStyles = getRoleStyles(waTheme);
 
   const [status, setStatus] = useState<{ whatsappLinked: boolean; whatsappLinkedAt?: string; contactPhone: string } | null>(null);
   const [session, setSession] = useState<{ awaitingHuman: boolean; messages: WhatsAppMessageEvent[] } | null>(null);
@@ -143,7 +170,7 @@ function QuoteRequestsTab({ me }: { me: { isOwner: boolean } }) {
 
       {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} />}
 
-      <Card size="small" style={{ marginBottom: 20, maxWidth: 560 }}>
+      <Card size="small" style={{ marginBottom: 20, maxWidth: 760 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
           {status?.whatsappLinked ? (
             <>
@@ -192,7 +219,7 @@ function QuoteRequestsTab({ me }: { me: { isOwner: boolean } }) {
       {!session ? (
         <Text type="secondary" style={{ fontSize: 13 }}>No messages yet — nothing to show until you send that first message.</Text>
       ) : (
-        <div style={{ maxWidth: 560 }}>
+        <div style={{ maxWidth: 760 }}>
           {session.awaitingHuman && (
             <Alert
               type="warning"
@@ -209,30 +236,58 @@ function QuoteRequestsTab({ me }: { me: { isOwner: boolean } }) {
 
           <div
             style={{
-              display: 'flex', flexDirection: 'column', gap: 10, padding: 14,
-              background: token.colorFillAlter, borderRadius: 8, maxHeight: 480, overflowY: 'auto',
+              borderRadius: 8, overflow: 'hidden', border: `1px solid ${token.colorBorderSecondary}`,
             }}
           >
-            {session.messages.length === 0 && <Text type="secondary">No messages yet.</Text>}
-            {session.messages.map((m, i) => {
-              const style = roleStyles[m.role];
-              return (
-                <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: style.align }}>
-                  {style.label && <Text type="secondary" style={{ fontSize: 11 }}>{style.label}</Text>}
-                  <div
-                    style={{
-                      background: style.bg, padding: '8px 12px', borderRadius: 12,
-                      maxWidth: '80%', whiteSpace: 'pre-wrap',
-                    }}
-                  >
-                    <Text>{m.content}</Text>
+            <div
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+                background: '#008069', color: '#fff',
+              }}
+            >
+              <WhatsAppOutlined style={{ fontSize: 18 }} />
+              <Text style={{ color: '#fff', fontWeight: 600, fontSize: 13 }}>
+                {status?.contactPhone ?? 'Your number'}
+              </Text>
+            </div>
+            <div
+              style={{
+                display: 'flex', flexDirection: 'column', gap: 6, padding: 14,
+                background: waTheme.wallpaper,
+                backgroundImage: `radial-gradient(${waTheme.dot} 1px, transparent 1px)`,
+                backgroundSize: '14px 14px',
+                maxHeight: 480, overflowY: 'auto',
+              }}
+            >
+              {session.messages.length === 0 && <Text type="secondary">No messages yet.</Text>}
+              {session.messages.map((m, i) => {
+                const style = roleStyles[m.role];
+                const isOutgoing = style.align === 'flex-end';
+                return (
+                  <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: style.align }}>
+                    {style.label && (
+                      <Text style={{ fontSize: 10.5, color: waTheme.labelColor, marginBottom: 2 }}>{style.label}</Text>
+                    )}
+                    <div
+                      style={{
+                        background: style.bg, color: waTheme.textColor,
+                        padding: '6px 9px 8px', maxWidth: '75%', whiteSpace: 'pre-wrap',
+                        fontSize: 14.2, lineHeight: 1.4,
+                        borderRadius: 7.5,
+                        borderTopRightRadius: isOutgoing ? 0 : 7.5,
+                        borderTopLeftRadius: isOutgoing ? 7.5 : 0,
+                        boxShadow: '0 1px 0.5px rgba(0,0,0,0.13)',
+                      }}
+                    >
+                      {m.content}
+                      <span style={{ display: 'block', textAlign: 'right', fontSize: 10, color: waTheme.timeColor, marginTop: 2 }}>
+                        {new Date(m.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
                   </div>
-                  <Text type="secondary" style={{ fontSize: 10 }}>
-                    {new Date(m.timestamp).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
-                  </Text>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
 
           {me.isOwner && !session.awaitingHuman && (
@@ -290,7 +345,7 @@ function ModuleTab() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
-  const [provider, setProvider] = useState<'twilio' | 'meta'>('twilio');
+  const [provider, setProvider] = useState<'twilio' | 'meta' | 'gupshup'>('twilio');
   const [twilioAccountSid, setTwilioAccountSid] = useState('');
   const [twilioAuthToken, setTwilioAuthToken] = useState('');
   const [twilioFromNumber, setTwilioFromNumber] = useState('');
@@ -301,6 +356,12 @@ function ModuleTab() {
   const [metaApiVersion, setMetaApiVersion] = useState('');
   const [hasMetaAccessToken, setHasMetaAccessToken] = useState(false);
   const [hasMetaAppSecret, setHasMetaAppSecret] = useState(false);
+  const [gupshupApiKey, setGupshupApiKey] = useState('');
+  const [gupshupSourceNumber, setGupshupSourceNumber] = useState('');
+  const [gupshupAppName, setGupshupAppName] = useState('');
+  const [gupshupWebhookSecret, setGupshupWebhookSecret] = useState('');
+  const [hasGupshupApiKey, setHasGupshupApiKey] = useState(false);
+  const [hasGupshupWebhookSecret, setHasGupshupWebhookSecret] = useState(false);
   const [configured, setConfigured] = useState(false);
 
   const openSettings = async () => {
@@ -320,6 +381,12 @@ function ModuleTab() {
       setHasMetaAppSecret(!!cfg.hasMetaAppSecret);
       setMetaAccessToken('');
       setMetaAppSecret('');
+      setGupshupSourceNumber(cfg.gupshupSourceNumber ?? '');
+      setGupshupAppName(cfg.gupshupAppName ?? '');
+      setHasGupshupApiKey(!!cfg.hasGupshupApiKey);
+      setHasGupshupWebhookSecret(!!cfg.hasGupshupWebhookSecret);
+      setGupshupApiKey('');
+      setGupshupWebhookSecret('');
       setConfigured(!!cfg.configured);
     } catch (err: unknown) {
       message.error(errMsg(err, 'Failed to load settings'));
@@ -338,6 +405,10 @@ function ModuleTab() {
         metaAccessToken: metaAccessToken.trim() || undefined,
         metaAppSecret: metaAppSecret.trim() || undefined,
         metaApiVersion: metaApiVersion.trim() || undefined,
+        gupshupApiKey: gupshupApiKey.trim() || undefined,
+        gupshupSourceNumber: gupshupSourceNumber.trim() || undefined,
+        gupshupAppName: gupshupAppName.trim() || undefined,
+        gupshupWebhookSecret: gupshupWebhookSecret.trim() || undefined,
       });
       message.success('WhatsApp settings saved');
       setSettingsOpen(false);
@@ -425,6 +496,7 @@ function ModuleTab() {
                 <Radio.Group value={provider} onChange={(e) => setProvider(e.target.value)}>
                   <Radio.Button value="twilio">Twilio</Radio.Button>
                   <Radio.Button value="meta">Meta Cloud API</Radio.Button>
+                  <Radio.Button value="gupshup">Gupshup</Radio.Button>
                 </Radio.Group>
               </div>
             </div>
@@ -506,6 +578,59 @@ function ModuleTab() {
                     placeholder="v21.0"
                     style={{ marginTop: 4 }}
                   />
+                </div>
+              </>
+            )}
+
+            {provider === 'gupshup' && (
+              <>
+                <div>
+                  <Text strong style={{ fontSize: 13 }}>App Name</Text>
+                  <Input
+                    value={gupshupAppName}
+                    onChange={(e) => setGupshupAppName(e.target.value)}
+                    placeholder="Your Gupshup app name"
+                    style={{ marginTop: 4 }}
+                  />
+                  <Text type="secondary" style={{ fontSize: 11 }}>
+                    Used to route inbound messages to your shop — Gupshup&apos;s webhook has no receiving phone
+                    number field, only the app name.
+                  </Text>
+                </div>
+                <div>
+                  <Text strong style={{ fontSize: 13 }}>Source Number</Text>
+                  <Input
+                    value={gupshupSourceNumber}
+                    onChange={(e) => setGupshupSourceNumber(e.target.value)}
+                    placeholder="919000000000"
+                    style={{ marginTop: 4 }}
+                  />
+                </div>
+                <div>
+                  <Text strong style={{ fontSize: 13 }}><LockOutlined style={{ marginRight: 4 }} />API Key</Text>
+                  <Input.Password
+                    value={gupshupApiKey}
+                    onChange={(e) => setGupshupApiKey(e.target.value)}
+                    placeholder={secretPlaceholder(hasGupshupApiKey, 'API key')}
+                    style={{ marginTop: 4 }}
+                  />
+                  <Text type="secondary" style={{ fontSize: 11 }}>
+                    Stored encrypted — never shown again once saved. Leave blank to keep the current one.
+                  </Text>
+                </div>
+                <div>
+                  <Text strong style={{ fontSize: 13 }}><LockOutlined style={{ marginRight: 4 }} />Webhook Secret</Text>
+                  <Input.Password
+                    value={gupshupWebhookSecret}
+                    onChange={(e) => setGupshupWebhookSecret(e.target.value)}
+                    placeholder={secretPlaceholder(hasGupshupWebhookSecret, 'webhook secret')}
+                    style={{ marginTop: 4 }}
+                  />
+                  <Text type="secondary" style={{ fontSize: 11 }}>
+                    Gupshup has no built-in webhook signature — this is your own chosen value, embedded as
+                    <Text code style={{ fontSize: 11 }}> /api/whatsapp/webhook/gupshup/&lt;this-value&gt;</Text> when
+                    you register the callback URL in Gupshup&apos;s console.
+                  </Text>
                 </div>
               </>
             )}
