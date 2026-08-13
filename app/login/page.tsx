@@ -26,10 +26,11 @@ function LoginForm() {
     setLoading(true);
     setError(null);
     try {
-      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/admin/login`, {
-        email: values.email,
-        password: values.password,
-      });
+      const res = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/auth/admin/login`,
+        { email: values.email, password: values.password },
+        { headers: { 'X-Portal-Host': window.location.host } },
+      );
       const { accessToken, refreshToken, user } = res.data.data;
       localStorage.setItem('token', accessToken);
       localStorage.setItem('refreshToken', refreshToken);
