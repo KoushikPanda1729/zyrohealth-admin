@@ -25,6 +25,7 @@ interface PrescriptionRequestRow {
   patient?: { fullName?: string; phoneNumber?: string };
   tenantName?: string;
   imageUrl: string;
+  patientNote?: string;
   status: RequestStatus;
   dispatchedShopIds: string[];
   chosenQuoteId?: string;
@@ -310,6 +311,9 @@ export default function PrescriptionRequestsPage() {
               <Descriptions.Item label="Status">
                 <Tag color={statusColor[selected.status]}>{selected.status.replace(/_/g, ' ').toUpperCase()}</Tag>
               </Descriptions.Item>
+              {selected.patientNote && (
+                <Descriptions.Item label="Patient Note">{selected.patientNote}</Descriptions.Item>
+              )}
             </Descriptions>
 
             <Text strong style={{ display: 'block', marginBottom: 8 }}>Prescription Photo</Text>
