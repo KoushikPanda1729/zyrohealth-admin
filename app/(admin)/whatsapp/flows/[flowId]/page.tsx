@@ -16,7 +16,8 @@ import {
   ApiOutlined, StarOutlined, CustomerServiceOutlined, StopOutlined, SaveOutlined,
   PlusOutlined, DeleteOutlined, MedicineBoxOutlined, TeamOutlined, CalendarOutlined,
   VideoCameraOutlined, DollarOutlined, CheckCircleOutlined, FileSearchOutlined,
-  ThunderboltOutlined,
+  ThunderboltOutlined, UploadOutlined, ClockCircleOutlined, ShopOutlined,
+  CreditCardOutlined, CarOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import { apiCall } from '../../../../../lib/api';
@@ -28,12 +29,21 @@ type FlowNodeType =
   | 'start' | 'message' | 'buttons' | 'ai' | 'condition' | 'api_call' | 'satisfaction' | 'handoff' | 'end'
   | 'platform_specialty_list' | 'platform_doctor_list' | 'platform_slot_list'
   | 'platform_consultation_type' | 'platform_payment_method'
-  | 'platform_create_booking' | 'platform_order_status';
+  | 'platform_create_booking' | 'platform_order_status'
+  | 'upload_prescription' | 'await_shop_quotes' | 'select_quote'
+  | 'order_payment' | 'track_delivery';
 
 const PLATFORM_NODE_TYPES: FlowNodeType[] = [
   'platform_specialty_list', 'platform_doctor_list', 'platform_slot_list',
   'platform_consultation_type', 'platform_payment_method',
   'platform_create_booking', 'platform_order_status',
+];
+
+// Same channel-agnostic node types run this over WhatsApp or the mobile
+// app — see whatsapp-flow-engine.service.ts's FlowSink abstraction.
+const PRESCRIPTION_NODE_TYPES: FlowNodeType[] = [
+  'upload_prescription', 'await_shop_quotes', 'select_quote',
+  'order_payment', 'track_delivery',
 ];
 
 interface ButtonOption { id: string; label: string }
@@ -71,6 +81,11 @@ const NODE_META: Record<FlowNodeType, { color: string; icon: React.ReactNode; la
   platform_payment_method: { color: '#0d9488', icon: <DollarOutlined />, label: 'Payment Method' },
   platform_create_booking: { color: '#0d9488', icon: <CheckCircleOutlined />, label: 'Create Booking' },
   platform_order_status: { color: '#0d9488', icon: <FileSearchOutlined />, label: 'Order Status' },
+  upload_prescription: { color: '#7c3aed', icon: <UploadOutlined />, label: 'Upload Prescription' },
+  await_shop_quotes: { color: '#7c3aed', icon: <ClockCircleOutlined />, label: 'Await Quotes' },
+  select_quote: { color: '#7c3aed', icon: <ShopOutlined />, label: 'Select Quote' },
+  order_payment: { color: '#7c3aed', icon: <CreditCardOutlined />, label: 'Order Payment' },
+  track_delivery: { color: '#7c3aed', icon: <CarOutlined />, label: 'Track Delivery' },
 };
 
 function summaryText(data: FlowNodeData): string {
@@ -89,6 +104,11 @@ function summaryText(data: FlowNodeData): string {
     case 'platform_payment_method': return 'Asks Pay Online vs Pay Offline';
     case 'platform_create_booking': return 'Creates the real booking (+ payment link if online)';
     case 'platform_order_status': return "Looks up the patient's latest order/booking";
+    case 'upload_prescription': return 'Asks for a prescription photo and creates the request';
+    case 'await_shop_quotes': return 'Waits until a pharmacy quote is ready';
+    case 'select_quote': return 'Shows quotes and lets the patient pick one';
+    case 'order_payment': return 'Collects delivery address, creates the order, sends a payment link';
+    case 'track_delivery': return "Shows the order's live delivery status";
     default: return '';
   }
 }
@@ -152,6 +172,14 @@ function nextId(prefix: string): string {
   return `${prefix}_${Date.now()}_${idCounter}`;
 }
 
+// Deterministic-but-staggered placement for a newly added node — avoids
+// Math.random() during render (impure) while still not stacking every new
+// node at the exact same spot.
+function nextNodePosition(): { x: number; y: number } {
+  const step = idCounter % 6;
+  return { x: 100 + step * 40, y: 100 + step * 30 };
+}
+
 export default function FlowEditorPage() {
   const params = useParams();
   const router = useRouter();
@@ -209,7 +237,7 @@ export default function FlowEditorPage() {
     const newNode: Node<FlowNodeData> = {
       id: nextId(type),
       type: 'flowNode',
-      position: { x: 100 + Math.random() * 200, y: 100 + Math.random() * 200 },
+      position: nextNodePosition(),
       data: defaultData,
     };
     setNodes((nds) => [...nds, newNode]);
@@ -323,10 +351,22 @@ export default function FlowEditorPage() {
                   </Button>
                 ))}
               </Space>
+              <Text strong style={{ fontSize: 12, marginTop: 8, display: 'block' }}>Prescription Flow</Text>
+              <Text type="secondary" style={{ fontSize: 10, display: 'block', marginTop: -6 }}>
+                Same channel-agnostic pipeline for WhatsApp or the mobile app — chain these to build the
+                upload-to-delivery journey
+              </Text>
+              <Space wrap style={{ maxWidth: 240 }}>
+                {PRESCRIPTION_NODE_TYPES.map((t) => (
+                  <Button key={t} size="small" icon={<PlusOutlined />} onClick={() => addNode(t)}>
+                    {NODE_META[t].label}
+                  </Button>
+                ))}
+              </Space>
               <Text strong style={{ fontSize: 12, marginTop: 8, display: 'block' }}>Add node</Text>
               <Space wrap style={{ maxWidth: 220 }}>
                 {(Object.keys(NODE_META) as FlowNodeType[])
-                  .filter((t) => t !== 'start' && !PLATFORM_NODE_TYPES.includes(t))
+                  .filter((t) => t !== 'start' && !PLATFORM_NODE_TYPES.includes(t) && !PRESCRIPTION_NODE_TYPES.includes(t))
                   .map((t) => (
                     <Button key={t} size="small" icon={<PlusOutlined />} onClick={() => addNode(t)}>
                       {NODE_META[t].label}
@@ -442,7 +482,7 @@ function NodeConfigForm({
             Add option
           </Button>
           <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 8 }}>
-            Drag a connection from each option's right-side dot to the node it should lead to.
+            Drag a connection from each option&apos;s right-side dot to the node it should lead to.
           </Text>
         </Form>
       );
@@ -482,7 +522,7 @@ function NodeConfigForm({
               <Input value={data.value} onChange={(e) => onChange({ value: e.target.value })} />
             </Form.Item>
           )}
-          <Text type="secondary" style={{ fontSize: 11 }}>Connect the "True" dot and "False" dot to different branches.</Text>
+          <Text type="secondary" style={{ fontSize: 11 }}>Connect the &quot;True&quot; dot and &quot;False&quot; dot to different branches.</Text>
         </Form>
       );
 
@@ -609,6 +649,47 @@ function NodeConfigForm({
         <Text type="secondary">
           Looks up the patient&apos;s latest medicine order and booking status and replies with it — same data as
           the hardcoded bot&apos;s status check.
+        </Text>
+      );
+
+    case 'upload_prescription':
+      return (
+        <Text type="secondary">
+          No configuration needed. Asks for a prescription photo (works over WhatsApp or the app&apos;s upload
+          screen) and creates a real prescription request. Stores it as <code>requestId</code>.
+        </Text>
+      );
+
+    case 'await_shop_quotes':
+      return (
+        <Text type="secondary">
+          No configuration needed. Re-checks <code>requestId</code>&apos;s status every turn until a pharmacy quote
+          is ready to show — safe to leave the patient parked here indefinitely.
+        </Text>
+      );
+
+    case 'select_quote':
+      return (
+        <Text type="secondary">
+          No configuration needed. Lists every submitted quote for <code>requestId</code> and lets the patient pick
+          one (by number over WhatsApp, or by tapping in the app). Marks every other shop&apos;s quote as not
+          selected and notifies them. Stores the choice as <code>chosenQuoteId</code>.
+        </Text>
+      );
+
+    case 'order_payment':
+      return (
+        <Text type="secondary">
+          No configuration needed. Asks for a delivery address, creates the real order from{' '}
+          <code>chosenQuoteId</code>, and sends a Stripe payment link. Stores the result as <code>orderId</code>.
+        </Text>
+      );
+
+    case 'track_delivery':
+      return (
+        <Text type="secondary">
+          No configuration needed. Shows <code>orderId</code>&apos;s live delivery status and keeps re-checking
+          until it&apos;s delivered.
         </Text>
       );
 
