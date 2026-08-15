@@ -21,6 +21,7 @@ interface Tenant {
   name: string;
   contactEmail?: string;
   whatsappFromNumber?: string;
+  address?: string;
   isActive: boolean;
   createdAt: string;
 }
@@ -55,6 +56,7 @@ export default function TenantsPage() {
   const [name, setName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [whatsappFromNumber, setWhatsappFromNumber] = useState('');
+  const [address, setAddress] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminFullName, setAdminFullName] = useState('');
   const [selectedModules, setSelectedModules] = useState<string[]>([]);
@@ -75,6 +77,7 @@ export default function TenantsPage() {
   const [editName, setEditName] = useState('');
   const [editContactEmail, setEditContactEmail] = useState('');
   const [editWhatsappFromNumber, setEditWhatsappFromNumber] = useState('');
+  const [editAddress, setEditAddress] = useState('');
   const [editSaving, setEditSaving] = useState(false);
 
   const fetchAll = useCallback(async () => {
@@ -108,13 +111,14 @@ export default function TenantsPage() {
         name: name.trim(),
         contactEmail: contactEmail.trim() || undefined,
         whatsappFromNumber: whatsappFromNumber.trim() || undefined,
+        address: address.trim() || undefined,
         moduleKeys: selectedModules,
         adminEmail: adminEmail.trim(),
         adminFullName: adminFullName.trim(),
       });
       const { tenant, adminUser, tempPassword } = result.data ?? result;
       setCreating(false);
-      setName(''); setContactEmail(''); setWhatsappFromNumber('');
+      setName(''); setContactEmail(''); setWhatsappFromNumber(''); setAddress('');
       setAdminEmail(''); setAdminFullName(''); setSelectedModules([]);
       setProvisioned({
         tenantName: tenant.name,
@@ -204,6 +208,7 @@ export default function TenantsPage() {
     setEditName(tenant.name);
     setEditContactEmail(tenant.contactEmail ?? '');
     setEditWhatsappFromNumber(tenant.whatsappFromNumber ?? '');
+    setEditAddress(tenant.address ?? '');
   };
 
   const saveEditTenant = async () => {
@@ -214,6 +219,7 @@ export default function TenantsPage() {
         name: editName.trim(),
         contactEmail: editContactEmail.trim() || undefined,
         whatsappFromNumber: editWhatsappFromNumber.trim() || undefined,
+        address: editAddress.trim() || undefined,
       });
       message.success('Tenant updated');
       setEditingTenant(null);
@@ -368,6 +374,19 @@ export default function TenantsPage() {
             <Input value={whatsappFromNumber} onChange={(e) => setWhatsappFromNumber(e.target.value)} placeholder="+1415..." style={{ marginTop: 4 }} />
             <Text type="secondary" style={{ fontSize: 11 }}>Leave blank to share the default number for now.</Text>
           </div>
+          <div>
+            <Text strong style={{ fontSize: 13 }}>Clinic address</Text>
+            <Input.TextArea
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Street, area, city, pincode"
+              rows={2}
+              style={{ marginTop: 4 }}
+            />
+            <Text type="secondary" style={{ fontSize: 11 }}>
+              Shown to patients booking an in-person appointment with this tenant&apos;s doctors.
+            </Text>
+          </div>
           <Divider style={{ margin: '4px 0' }} />
           <div>
             <Text strong style={{ fontSize: 13 }}>First admin account</Text>
@@ -462,6 +481,16 @@ export default function TenantsPage() {
           <div>
             <Text strong style={{ fontSize: 13 }}>WhatsApp number</Text>
             <Input value={editWhatsappFromNumber} onChange={(e) => setEditWhatsappFromNumber(e.target.value)} style={{ marginTop: 4 }} />
+          </div>
+          <div>
+            <Text strong style={{ fontSize: 13 }}>Clinic address</Text>
+            <Input.TextArea
+              value={editAddress}
+              onChange={(e) => setEditAddress(e.target.value)}
+              placeholder="Street, area, city, pincode"
+              rows={2}
+              style={{ marginTop: 4 }}
+            />
           </div>
         </Space>
       </Modal>
