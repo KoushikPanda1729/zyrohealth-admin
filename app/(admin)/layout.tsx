@@ -26,6 +26,7 @@ import {
   AlertOutlined,
   ReadOutlined,
   WomanOutlined,
+  MobileOutlined,
   MoonOutlined,
   SunOutlined,
   IdcardOutlined,
@@ -75,6 +76,7 @@ const SUPER_ADMIN_MENU_ITEMS = [
   { key: '/platform/admins', icon: <TeamOutlined />, label: 'Tenant Admin', superAdminOnly: false },
   { key: '/platform/medicine-shops', icon: <ShopOutlined />, label: 'Medicine Shops', superAdminOnly: false },
   { key: '/platform/shop-payouts', icon: <WalletOutlined />, label: 'Shop Payouts', superAdminOnly: false },
+  { key: '/platform/app-config', icon: <MobileOutlined />, label: 'App Config', superAdminOnly: false },
   // Managing who else gets platform-level access is itself a sensitive
   // action — never shown to a platform_support viewer, only super_admin.
   { key: '/platform/team', icon: <SafetyCertificateOutlined />, label: 'Platform Team', superAdminOnly: true },
@@ -105,6 +107,7 @@ const pageTitles: Record<string, string> = {
   '/platform/admins': 'Tenant Admin',
   '/platform/medicine-shops': 'Medicine Shops',
   '/platform/shop-payouts': 'Shop Payouts',
+  '/platform/app-config': 'Mobile App Configuration',
   '/platform/team': 'Platform Team',
 };
 
