@@ -131,7 +131,14 @@ function QuoteRequestsTab({ me }: { me: { isOwner: boolean } }) {
         apiCall('GET', '/api/shop/whatsapp/session'),
       ]);
       setStatus(statusResult.data ?? statusResult);
-      setSession((sessionResult.data ?? sessionResult) || null);
+      // `?? sessionResult` would be wrong here: the backend legitimately
+      // returns `{ data: null }` when this shop has no conversation yet,
+      // and null-coalescing can't tell "missing key" apart from "value is
+      // null" — it'd fall back to the whole {success, data} wrapper
+      // object, which is truthy and has no `messages` field, crashing the
+      // render below. `.data` always exists on this API's responses, so
+      // just read it directly.
+      setSession(sessionResult.data ?? null);
     } catch (err: unknown) {
       setError(errMsg(err, 'Failed to load WhatsApp status'));
     } finally { setLoading(false); }
