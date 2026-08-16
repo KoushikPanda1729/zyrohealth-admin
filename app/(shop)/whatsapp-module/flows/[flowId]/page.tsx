@@ -270,19 +270,19 @@ export default function ShopFlowEditorPage() {
           { title: flowName },
         ]}
       />
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 12 }}>
         <Input
           value={flowName}
           onChange={(e) => setFlowName(e.target.value)}
-          style={{ maxWidth: 320, fontWeight: 600 }}
+          style={{ maxWidth: 320, width: '100%', flex: '1 1 200px', fontWeight: 600 }}
         />
-        <Space>
+        <Space wrap>
           <Button icon={<ThunderboltOutlined />} onClick={() => setAiEditing(true)}>Edit with AI</Button>
           <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={save}>Save</Button>
         </Space>
       </div>
 
-      <div style={{ flex: 1, border: '1px solid #f0f0f0', borderRadius: 8 }}>
+      <div style={{ flex: 1, width: '100%', border: '1px solid #f0f0f0', borderRadius: 8 }}>
         <ReactFlow
           nodes={nodes}
           edges={edges}

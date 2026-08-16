@@ -250,6 +250,7 @@ export default function UsersPage() {
           onChange={(pag: TablePaginationConfig) => fetchUsers(pag.current || 1, roleFilter)}
           bordered
           size="middle"
+          scroll={{ x: 'max-content' }}
         />
       )}
 

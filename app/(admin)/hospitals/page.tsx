@@ -208,7 +208,7 @@ export default function HospitalsPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 16 }}>
         <Title level={4} style={{ margin: 0 }}>
           <BankOutlined style={{ marginRight: 8 }} />Hospitals
         </Title>
@@ -232,7 +232,7 @@ export default function HospitalsPage() {
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spin size="large" /></div>
       ) : (
-        <Table columns={columns} dataSource={hospitals.map((h) => ({ ...h, key: h.id }))} bordered size="middle" />
+        <Table columns={columns} dataSource={hospitals.map((h) => ({ ...h, key: h.id }))} bordered size="middle" scroll={{ x: 'max-content' }} />
       )}
 
       <Drawer

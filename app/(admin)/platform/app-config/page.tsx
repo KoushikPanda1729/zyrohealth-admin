@@ -391,8 +391,8 @@ export default function AppConfigPage() {
       {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} />}
 
       {config && (
-        <Row gutter={24}>
-          <Col span={13}>
+        <Row gutter={[24, 24]}>
+          <Col xs={24} md={13}>
             <Card
               title={<span><HomeOutlined style={{ marginRight: 8, color: '#199A8E' }} />Home Screen Top Tabs</span>}
               size="small"
@@ -471,10 +471,12 @@ export default function AppConfigPage() {
             </Card>
           </Col>
 
-          <Col span={11}>
+          <Col xs={24} md={11}>
             <div style={{ position: 'sticky', top: 24 }}>
               <Text strong style={{ fontSize: 13, display: 'block', marginBottom: 10 }}>Live Preview</Text>
-              <AppPreview config={config} banners={banners} />
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <AppPreview config={config} banners={banners} />
+              </div>
             </div>
           </Col>
         </Row>

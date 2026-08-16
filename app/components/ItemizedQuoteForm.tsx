@@ -48,33 +48,38 @@ export default function ItemizedQuoteForm({ submitting, submitLabel, onSubmit }:
 
   return (
     <div>
-      <Space direction="vertical" style={{ width: '100%' }} size="small">
-        {rows.map((row, i) => (
-          <Space.Compact key={i} style={{ width: '100%' }}>
-            <Input
-              placeholder="Medicine name"
-              value={row.name}
-              onChange={(e) => updateRow(i, { name: e.target.value })}
-              style={{ width: '50%' }}
-            />
-            <InputNumber
-              placeholder="Qty"
-              min={1}
-              value={row.quantity}
-              onChange={(v) => updateRow(i, { quantity: v || 1 })}
-              style={{ width: '20%' }}
-            />
-            <InputNumber
-              placeholder="Price/unit (₹)"
-              min={0.01}
-              value={row.priceCents != null ? row.priceCents / 100 : null}
-              onChange={(v) => updateRow(i, { priceCents: v != null ? Math.round(v * 100) : null })}
-              style={{ width: '30%' }}
-            />
-            <Button icon={<DeleteOutlined />} onClick={() => removeRow(i)} disabled={rows.length === 1} />
-          </Space.Compact>
-        ))}
-      </Space>
+      {/* Horizontal scroll fallback on narrow phones: the four cells below
+          have a sensible minimum usable width, so rather than squashing
+          them unreadably thin we let the row scroll sideways instead. */}
+      <div style={{ overflowX: 'auto' }}>
+        <Space direction="vertical" style={{ width: '100%', minWidth: 380 }} size="small">
+          {rows.map((row, i) => (
+            <Space.Compact key={i} style={{ width: '100%' }}>
+              <Input
+                placeholder="Medicine name"
+                value={row.name}
+                onChange={(e) => updateRow(i, { name: e.target.value })}
+                style={{ width: '50%' }}
+              />
+              <InputNumber
+                placeholder="Qty"
+                min={1}
+                value={row.quantity}
+                onChange={(v) => updateRow(i, { quantity: v || 1 })}
+                style={{ width: '20%' }}
+              />
+              <InputNumber
+                placeholder="Price/unit (₹)"
+                min={0.01}
+                value={row.priceCents != null ? row.priceCents / 100 : null}
+                onChange={(v) => updateRow(i, { priceCents: v != null ? Math.round(v * 100) : null })}
+                style={{ width: '30%' }}
+              />
+              <Button icon={<DeleteOutlined />} onClick={() => removeRow(i)} disabled={rows.length === 1} />
+            </Space.Compact>
+          ))}
+        </Space>
+      </div>
 
       <Button type="dashed" icon={<PlusOutlined />} onClick={addRow} block style={{ marginTop: 8 }}>
         Add Medicine

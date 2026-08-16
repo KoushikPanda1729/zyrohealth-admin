@@ -333,7 +333,7 @@ function StaffTab({
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spin size="large" /></div>
       ) : (
-        <Table columns={columns} dataSource={staff.map((s) => ({ ...s, key: s.id }))} bordered size="middle" />
+        <Table columns={columns} dataSource={staff.map((s) => ({ ...s, key: s.id }))} bordered size="middle" scroll={{ x: 'max-content' }} />
       )}
 
       <Drawer
@@ -526,7 +526,7 @@ function RolesTab({
         delegated permission can never grant more power than you intended.
       </Text>
 
-      <Table columns={columns} dataSource={roles.map((r) => ({ ...r, key: r.id }))} bordered size="middle" />
+      <Table columns={columns} dataSource={roles.map((r) => ({ ...r, key: r.id }))} bordered size="middle" scroll={{ x: 'max-content' }} />
 
       <Drawer
         title={editing ? `Edit "${editing.name}"` : 'New Role'}
@@ -730,7 +730,7 @@ function AttendanceTab({
           ) : rows.length === 0 ? (
             <Empty description="No attendance records for this range" />
           ) : (
-            <Table columns={columns} dataSource={rows.map((r) => ({ ...r, key: r.id }))} bordered size="middle" pagination={{ pageSize: 15 }} />
+            <Table columns={columns} dataSource={rows.map((r) => ({ ...r, key: r.id }))} bordered size="middle" pagination={{ pageSize: 15 }} scroll={{ x: 'max-content' }} />
           )}
         </>
       )}
@@ -877,18 +877,18 @@ function LeaveTab({
 
   return (
     <div>
-      <Row gutter={16} style={{ marginBottom: 20 }}>
-        <Col>
+      <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
+        <Col xs={24} sm={12} md={8}>
           <Card size="small">
             <Statistic title="Annual Leave Quota" value={balance?.annualQuota ?? '—'} suffix="days" />
           </Card>
         </Col>
-        <Col>
+        <Col xs={24} sm={12} md={8}>
           <Card size="small">
             <Statistic title="Taken This Year (paid)" value={balance?.paidDaysTakenThisYear ?? '—'} suffix="days" />
           </Card>
         </Col>
-        <Col>
+        <Col xs={24} sm={12} md={8}>
           <Card size="small">
             <Statistic title="Remaining" value={balance?.remaining ?? '—'} suffix="days" styles={{ content: { color: '#3f8600' } }} />
           </Card>
@@ -912,7 +912,7 @@ function LeaveTab({
         ) : requests.length === 0 ? (
           <Empty description="No leave requests yet" />
         ) : (
-          <Table columns={columns} dataSource={requests.map((r) => ({ ...r, key: r.id }))} bordered size="middle" pagination={{ pageSize: 15 }} />
+          <Table columns={columns} dataSource={requests.map((r) => ({ ...r, key: r.id }))} bordered size="middle" pagination={{ pageSize: 15 }} scroll={{ x: 'max-content' }} />
         )
       ) : (
         <Text type="secondary" style={{ fontSize: 12 }}>
@@ -1165,7 +1165,7 @@ function PayrollTab({
         {myRecords.length === 0 ? (
           <Text type="secondary" style={{ fontSize: 12 }}>No payroll records yet.</Text>
         ) : (
-          <Table columns={myRecordColumns} dataSource={myRecords.map((r) => ({ ...r, key: r.id }))} size="small" pagination={false} />
+          <Table columns={myRecordColumns} dataSource={myRecords.map((r) => ({ ...r, key: r.id }))} size="small" pagination={false} scroll={{ x: 'max-content' }} />
         )}
       </Card>
 
@@ -1177,6 +1177,7 @@ function PayrollTab({
             size="small"
             bordered
             style={{ marginBottom: 24 }}
+            scroll={{ x: 'max-content' }}
             dataSource={staff.filter((s) => s.shopStaffRole !== 'owner').map((s) => ({ ...s, key: s.id }))}
             columns={[
               { title: 'Staff', dataIndex: 'fullName', key: 'fullName', render: (v: string, s: StaffRow) => v || s.email },
@@ -1225,7 +1226,7 @@ function PayrollTab({
           ) : allRecords.length === 0 ? (
             <Empty description="No payroll records for this month yet" />
           ) : (
-            <Table columns={recordColumns} dataSource={allRecords.map((r) => ({ ...r, key: r.id }))} bordered size="middle" />
+            <Table columns={recordColumns} dataSource={allRecords.map((r) => ({ ...r, key: r.id }))} bordered size="middle" scroll={{ x: 'max-content' }} />
           )}
         </>
       )}
@@ -1240,24 +1241,24 @@ function PayrollTab({
       >
         <Form form={profileForm} layout="vertical" onFinish={saveProfile}>
           <Row gutter={12}>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item label="Employee Code" name="employeeCode">
                 <Input placeholder="e.g. EMP-001" />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item label="Joined On" name="joinedAt">
                 <DatePicker style={{ width: '100%' }} />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={12}>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item label="Monthly Base Salary (₹)" name="monthlyBaseSalary" rules={[{ required: true, message: 'Required' }]}>
                 <InputNumber style={{ width: '100%' }} min={0} />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item label="Annual Leave Quota (days)" name="annualLeaveQuota">
                 <InputNumber style={{ width: '100%' }} min={0} />
               </Form.Item>
@@ -1280,20 +1281,20 @@ function PayrollTab({
                   message="These are standard-rate starting points, not certified tax/compliance advice — verify with your accountant."
                 />
                 <Row gutter={12} align="middle">
-                  <Col span={8}><Form.Item name="pfEnabled" valuePropName="checked" label="PF"><Switch /></Form.Item></Col>
-                  <Col span={16}><Form.Item label="Employee %" name="pfEmployeePercent"><InputNumber style={{ width: '100%' }} min={0} max={100} /></Form.Item></Col>
+                  <Col xs={24} sm={8}><Form.Item name="pfEnabled" valuePropName="checked" label="PF"><Switch /></Form.Item></Col>
+                  <Col xs={24} sm={16}><Form.Item label="Employee %" name="pfEmployeePercent"><InputNumber style={{ width: '100%' }} min={0} max={100} /></Form.Item></Col>
                 </Row>
                 <Row gutter={12} align="middle">
-                  <Col span={8}><Form.Item name="esiEnabled" valuePropName="checked" label="ESI"><Switch /></Form.Item></Col>
-                  <Col span={16}><Form.Item label="Employee %" name="esiEmployeePercent"><InputNumber style={{ width: '100%' }} min={0} max={100} /></Form.Item></Col>
+                  <Col xs={24} sm={8}><Form.Item name="esiEnabled" valuePropName="checked" label="ESI"><Switch /></Form.Item></Col>
+                  <Col xs={24} sm={16}><Form.Item label="Employee %" name="esiEmployeePercent"><InputNumber style={{ width: '100%' }} min={0} max={100} /></Form.Item></Col>
                 </Row>
                 <Row gutter={12} align="middle">
-                  <Col span={8}><Form.Item name="professionalTaxEnabled" valuePropName="checked" label="Prof. Tax"><Switch /></Form.Item></Col>
-                  <Col span={16}><Form.Item label="Flat Amount (₹/mo)" name="professionalTax"><InputNumber style={{ width: '100%' }} min={0} /></Form.Item></Col>
+                  <Col xs={24} sm={8}><Form.Item name="professionalTaxEnabled" valuePropName="checked" label="Prof. Tax"><Switch /></Form.Item></Col>
+                  <Col xs={24} sm={16}><Form.Item label="Flat Amount (₹/mo)" name="professionalTax"><InputNumber style={{ width: '100%' }} min={0} /></Form.Item></Col>
                 </Row>
                 <Row gutter={12} align="middle">
-                  <Col span={8}><Form.Item name="tdsEnabled" valuePropName="checked" label="TDS"><Switch /></Form.Item></Col>
-                  <Col span={16}><Form.Item label="Percent" name="tdsPercent"><InputNumber style={{ width: '100%' }} min={0} max={100} /></Form.Item></Col>
+                  <Col xs={24} sm={8}><Form.Item name="tdsEnabled" valuePropName="checked" label="TDS"><Switch /></Form.Item></Col>
+                  <Col xs={24} sm={16}><Form.Item label="Percent" name="tdsPercent"><InputNumber style={{ width: '100%' }} min={0} max={100} /></Form.Item></Col>
                 </Row>
               </>
             )}

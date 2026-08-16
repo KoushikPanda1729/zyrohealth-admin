@@ -276,8 +276,10 @@ export default function AIDoctorsPage() {
       <div
         style={{
           display: 'flex',
+          flexWrap: 'wrap',
           justifyContent: 'space-between',
           alignItems: 'center',
+          gap: 8,
           marginBottom: 16,
         }}
       >
@@ -304,6 +306,7 @@ export default function AIDoctorsPage() {
           pagination={{ pageSize: 20 }}
           bordered
           size="middle"
+          scroll={{ x: 'max-content' }}
         />
       )}
 

@@ -13,3 +13,50 @@ body {
 .ant-layout {
   min-height: 100vh;
 }
+
+html, body {
+  /* A single overflowing element (an unbounded table, a fixed-width row)
+     anywhere on an admin page must never be able to widen the whole
+     document — it should scroll within its own container instead. */
+  overflow-x: hidden;
+}
+
+@media (max-width: 768px) {
+  /* Ant's default Modal width (520px+) overflows most phone viewports;
+     cap every modal to the viewport instead of touching each call site. */
+  .ant-modal {
+    max-width: calc(100vw - 24px);
+    width: calc(100vw - 24px) !important;
+    top: 12px;
+    padding-bottom: 12px;
+  }
+
+  .ant-drawer-content-wrapper {
+    max-width: calc(100vw - 24px);
+  }
+
+  .ant-table {
+    font-size: 13px;
+  }
+
+  .ant-table-thead > tr > th,
+  .ant-table-tbody > tr > td {
+    padding: 8px !important;
+  }
+
+  .ant-statistic-content {
+    font-size: 20px;
+  }
+
+  .ant-page-header {
+    padding: 12px !important;
+  }
+
+  .ant-card-body {
+    padding: 12px !important;
+  }
+
+  .ant-descriptions-view table {
+    width: 100%;
+  }
+}

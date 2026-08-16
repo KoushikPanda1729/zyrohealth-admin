@@ -228,6 +228,7 @@ export default function BookingsPage() {
           onChange={handleTableChange}
           bordered
           size="middle"
+          scroll={{ x: 'max-content' }}
         />
       )}
     </div>

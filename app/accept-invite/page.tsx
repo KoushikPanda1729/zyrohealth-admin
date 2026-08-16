@@ -71,6 +71,7 @@ function AcceptInviteForm() {
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
+        padding: '0 16px',
         background: isDark
           ? 'linear-gradient(135deg, #141414 0%, #1f1f1f 100%)'
           : 'linear-gradient(135deg, #e6f4ff 0%, #f0f5ff 100%)',
@@ -86,7 +87,8 @@ function AcceptInviteForm() {
       />
       <Card
         style={{
-          width: 420,
+          width: '100%',
+          maxWidth: 420,
           boxShadow: '0 8px 32px rgba(22, 119, 255, 0.12)',
           borderRadius: 16,
         }}

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Layout, Menu, Button, Typography, theme, App, Select, message, Avatar, Dropdown, Modal } from 'antd';
+import { Layout, Menu, Button, Typography, theme, App, Select, message, Avatar, Dropdown, Modal, Drawer } from 'antd';
 import type { MenuProps } from 'antd';
 import {
   DashboardOutlined,
@@ -34,6 +34,7 @@ import {
   DownOutlined,
   LeftOutlined,
   RightOutlined,
+  MenuOutlined,
 } from '@ant-design/icons';
 import { useRouter, usePathname } from 'next/navigation';
 import axios from 'axios';
@@ -115,6 +116,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [role, setRole] = useState<string | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
@@ -125,6 +128,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [switchingTenant, setSwitchingTenant] = useState(false);
   const { token } = theme.useToken();
   const { isDark, toggle: toggleTheme } = useThemeMode();
+
+  // Below this width the fixed 220px Sider would eat most of the viewport,
+  // so it's swapped for an off-canvas Drawer opened via the header hamburger
+  // instead of the desktop collapse/expand toggle.
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 768px)');
+    const applyMatch = (matches: boolean) => setIsMobile(matches);
+    applyMatch(mql.matches);
+    const handler = (e: MediaQueryListEvent) => applyMatch(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+
+  // A menu click already navigates away, but the drawer itself doesn't
+  // auto-close on route change without this — leaving it open on top of
+  // the page the admin just chose.
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     (async () => {
@@ -345,162 +367,188 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (!mounted) return null;
 
+  // The drawer is always shown fully expanded (it's an overlay, not a
+  // permanent rail), so it ignores the desktop collapse state entirely.
+  const sidebarCollapsed = isMobile ? false : collapsed;
+
+  const sidebarBody = (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Logo */}
+      <div
+        style={{
+          height: 64,
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+          paddingLeft: sidebarCollapsed ? 0 : 20,
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
+        }}
+      >
+        {sidebarCollapsed ? (
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              background: '#fff',
+              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              padding: 4,
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-icon.png" alt="ZyroHealth" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          </div>
+        ) : (
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: 8,
+              padding: '6px 10px',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-full.png" alt="ZyroHealth" style={{ height: 18, width: 'auto', display: 'block' }} />
+          </div>
+        )}
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+        <Menu
+          theme="dark"
+          mode="inline"
+          selectedKeys={[pathname]}
+          items={menuItems}
+          onClick={handleMenuClick}
+          style={{ marginTop: 8, border: 'none' }}
+        />
+      </div>
+
+      {/* Pinned logout footer — always visible without opening a menu,
+          separate from the header's account dropdown. Identity (name)
+          lives in the header dropdown, not duplicated here. */}
+      <div
+        style={{
+          flexShrink: 0,
+          borderTop: '1px solid rgba(255,255,255,0.1)',
+          padding: sidebarCollapsed ? '8px' : '8px 12px',
+        }}
+      >
+        <Button
+          type="text"
+          danger
+          block={!sidebarCollapsed}
+          shape={sidebarCollapsed ? 'circle' : 'default'}
+          icon={<LogoutOutlined />}
+          onClick={handleLogout}
+          title="Logout"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            margin: sidebarCollapsed ? '0 auto' : undefined,
+          }}
+        >
+          {!sidebarCollapsed && 'Logout'}
+        </Button>
+      </div>
+    </div>
+  );
+
   return (
     <App>
     <Layout style={{ minHeight: '100vh' }}>
-      <Sider
-        collapsible
-        collapsed={collapsed}
-        onCollapse={setCollapsed}
-        theme="dark"
-        width={220}
-        trigger={null}
-        style={{
-          position: 'fixed',
-          left: 0,
-          top: 0,
-          bottom: 0,
-          zIndex: 100,
-          overflow: 'hidden',
-        }}
-      >
-        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-          {/* Logo */}
-          <div
-            style={{
-              height: 64,
-              flexShrink: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: collapsed ? 'center' : 'flex-start',
-              paddingLeft: collapsed ? 0 : 20,
-              borderBottom: '1px solid rgba(255,255,255,0.1)',
-            }}
-          >
-            {collapsed ? (
-              <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  background: '#fff',
-                  borderRadius: 8,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                  padding: 4,
-                }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/logo-icon.png" alt="ZyroHealth" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-              </div>
-            ) : (
-              <div
-                style={{
-                  background: '#fff',
-                  borderRadius: 8,
-                  padding: '6px 10px',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/logo-full.png" alt="ZyroHealth" style={{ height: 18, width: 'auto', display: 'block' }} />
-              </div>
-            )}
-          </div>
-
-          <div style={{ flex: 1, overflowY: 'auto' }}>
-            <Menu
-              theme="dark"
-              mode="inline"
-              selectedKeys={[pathname]}
-              items={menuItems}
-              onClick={handleMenuClick}
-              style={{ marginTop: 8, border: 'none' }}
-            />
-          </div>
-
-          {/* Pinned logout footer — always visible without opening a menu,
-              separate from the header's account dropdown. Identity (name)
-              lives in the header dropdown, not duplicated here. */}
-          <div
-            style={{
-              flexShrink: 0,
-              borderTop: '1px solid rgba(255,255,255,0.1)',
-              padding: collapsed ? '8px' : '8px 12px',
-            }}
-          >
-            <Button
-              type="text"
-              danger
-              block={!collapsed}
-              shape={collapsed ? 'circle' : 'default'}
-              icon={<LogoutOutlined />}
-              onClick={handleLogout}
-              title="Logout"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                margin: collapsed ? '0 auto' : undefined,
-              }}
-            >
-              {!collapsed && 'Logout'}
-            </Button>
-          </div>
-        </div>
-      </Sider>
+      {isMobile ? (
+        <Drawer
+          placement="left"
+          closable={false}
+          open={mobileNavOpen}
+          onClose={() => setMobileNavOpen(false)}
+          size={220}
+          styles={{ body: { padding: 0, background: '#001529' }, section: { background: '#001529' } }}
+        >
+          {sidebarBody}
+        </Drawer>
+      ) : (
+        <Sider
+          collapsible
+          collapsed={collapsed}
+          onCollapse={setCollapsed}
+          theme="dark"
+          width={220}
+          trigger={null}
+          style={{
+            position: 'fixed',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            zIndex: 100,
+            overflow: 'hidden',
+          }}
+        >
+          {sidebarBody}
+        </Sider>
+      )}
 
       {/* Edge-attached collapse toggle, straddling the sidebar/content
-          boundary — replaces the old hamburger button inside the header. */}
-      <div
-        onClick={() => setCollapsed(!collapsed)}
-        title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        style={{
-          position: 'fixed',
-          top: 72,
-          left: collapsed ? 80 - 12 : 220 - 12,
-          zIndex: 101,
-          width: 24,
-          height: 24,
-          borderRadius: '50%',
-          background: token.colorBgContainer,
-          border: `1px solid ${token.colorBorderSecondary}`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
-          transition: 'left 0.2s',
-        }}
-      >
-        {collapsed ? <RightOutlined style={{ fontSize: 10 }} /> : <LeftOutlined style={{ fontSize: 10 }} />}
-      </div>
+          boundary — replaces the old hamburger button inside the header.
+          Desktop only: mobile opens/closes the drawer from the header. */}
+      {!isMobile && (
+        <div
+          onClick={() => setCollapsed(!collapsed)}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          style={{
+            position: 'fixed',
+            top: 72,
+            left: collapsed ? 80 - 12 : 220 - 12,
+            zIndex: 101,
+            width: 24,
+            height: 24,
+            borderRadius: '50%',
+            background: token.colorBgContainer,
+            border: `1px solid ${token.colorBorderSecondary}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+            transition: 'left 0.2s',
+          }}
+        >
+          {collapsed ? <RightOutlined style={{ fontSize: 10 }} /> : <LeftOutlined style={{ fontSize: 10 }} />}
+        </div>
+      )}
 
-      <Layout style={{ marginLeft: collapsed ? 80 : 220, transition: 'margin-left 0.2s' }}>
+      <Layout style={{ marginLeft: isMobile ? 0 : (collapsed ? 80 : 220), transition: 'margin-left 0.2s' }}>
         {impersonatingTenant && (
           <div
             style={{
               background: token.colorWarningBg,
               borderBottom: `1px solid ${token.colorWarningBorder}`,
-              padding: '8px 24px',
+              padding: isMobile ? '8px 12px' : '8px 24px',
               display: 'flex',
-              alignItems: 'center',
+              flexDirection: isMobile ? 'column' : 'row',
+              alignItems: isMobile ? 'stretch' : 'center',
               justifyContent: 'space-between',
+              gap: 8,
               position: 'sticky',
               top: 0,
               zIndex: 100,
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
               <Text style={{ fontSize: 13, color: token.colorWarningText }}>
                 Viewing as <Text strong style={{ color: token.colorWarningText }}>{impersonatingTenant}</Text>&apos;s admin (super admin session)
               </Text>
               {platformTenants.length > 1 && (
                 <Select
                   size="small"
-                  style={{ width: 180 }}
+                  style={{ width: isMobile ? '100%' : 180 }}
                   value={impersonatingTenantId ?? undefined}
                   loading={switchingTenant}
                   disabled={switchingTenant}
@@ -517,7 +565,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <Header
           style={{
             background: token.colorBgContainer,
-            padding: '0 24px',
+            padding: isMobile ? '0 12px' : '0 24px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -525,13 +573,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             position: 'sticky',
             top: 0,
             zIndex: 99,
+            gap: 8,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Text style={{ fontSize: 16, fontWeight: 600 }}>{currentTitle}</Text>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+            {isMobile && (
+              <Button
+                type="text"
+                shape="circle"
+                icon={<MenuOutlined />}
+                onClick={() => setMobileNavOpen(true)}
+                title="Open menu"
+              />
+            )}
+            <Text style={{ fontSize: 16, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {currentTitle}
+            </Text>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
             <Button
               type="text"
               shape="circle"
@@ -539,7 +599,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               onClick={toggleTheme}
               title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
             />
-            <div style={{ width: 1, height: 24, background: token.colorBorderSecondary, margin: '0 8px' }} />
+            {!isMobile && <div style={{ width: 1, height: 24, background: token.colorBorderSecondary, margin: '0 8px' }} />}
             <Dropdown
               menu={{ items: userMenuItems, onClick: handleUserMenuClick }}
               trigger={['click']}
@@ -556,9 +616,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 }}
               >
                 <Avatar size={30} src={userInfo.avatarUrl} icon={<UserOutlined />} />
-                <Text style={{ fontSize: 13, maxWidth: 120 }} ellipsis>
-                  {userInfo.fullName || 'Account'}
-                </Text>
+                {!isMobile && (
+                  <Text style={{ fontSize: 13, maxWidth: 120 }} ellipsis>
+                    {userInfo.fullName || 'Account'}
+                  </Text>
+                )}
                 <DownOutlined style={{ fontSize: 10, color: token.colorTextTertiary }} />
               </div>
             </Dropdown>
@@ -567,7 +629,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         <Content
           style={{
-            padding: 24,
+            padding: isMobile ? 12 : 24,
             background: token.colorBgLayout,
             minHeight: 'calc(100vh - 64px)',
           }}

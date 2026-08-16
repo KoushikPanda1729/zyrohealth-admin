@@ -647,7 +647,7 @@ export default function BillingPage() {
                   <Button type="primary" icon={<PlusOutlined />} onClick={openCustomerForm} style={{ marginBottom: 12 }}>
                     New Customer
                   </Button>
-                  <Table columns={customerColumns} dataSource={customers.map((c) => ({ ...c, key: c.id }))} bordered size="middle" />
+                  <Table columns={customerColumns} dataSource={customers.map((c) => ({ ...c, key: c.id }))} bordered size="middle" scroll={{ x: 'max-content' }} />
                 </div>
               ),
             },
@@ -669,6 +669,7 @@ export default function BillingPage() {
                         pagination={false}
                         bordered
                         size="small"
+                        scroll={{ x: 'max-content' }}
                         dataSource={PAYMENT_MODE_OPTIONS.map((m) => ({
                           key: m.value,
                           mode: m.label,
@@ -726,14 +727,14 @@ export default function BillingPage() {
                     <Empty description="No data" />
                   ) : (
                     <>
-                      <Row gutter={16} style={{ marginBottom: 24 }}>
-                        <Col span={8}>
+                      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+                        <Col xs={24} sm={12} md={8}>
                           <Card size="small"><Statistic title="Revenue" value={formatRs(analytics.totalRevenueCents)} /></Card>
                         </Col>
-                        <Col span={8}>
+                        <Col xs={24} sm={12} md={8}>
                           <Card size="small"><Statistic title="GST Collected" value={formatRs(analytics.totalGstCents)} /></Card>
                         </Col>
-                        <Col span={8}>
+                        <Col xs={24} sm={12} md={8}>
                           <Card size="small"><Statistic title="Invoices" value={analytics.saleCount} /></Card>
                         </Col>
                       </Row>
@@ -758,12 +759,13 @@ export default function BillingPage() {
                         </div>
                       )}
 
-                      <Row gutter={16}>
-                        <Col span={12}>
+                      <Row gutter={[16, 16]}>
+                        <Col xs={24} md={12}>
                           <Text strong style={{ display: 'block', marginBottom: 8 }}>Best Sellers (by quantity)</Text>
                           <Table
                             size="small"
                             pagination={false}
+                            scroll={{ x: 'max-content' }}
                             dataSource={analytics.topMedicinesByQuantity.map((m, i) => ({ ...m, key: i }))}
                             columns={[
                               { title: 'Medicine', dataIndex: 'name', key: 'name' },
@@ -771,11 +773,12 @@ export default function BillingPage() {
                             ]}
                           />
                         </Col>
-                        <Col span={12}>
+                        <Col xs={24} md={12}>
                           <Text strong style={{ display: 'block', marginBottom: 8 }}>Top Revenue Medicines</Text>
                           <Table
                             size="small"
                             pagination={false}
+                            scroll={{ x: 'max-content' }}
                             dataSource={analytics.topMedicinesByRevenue.map((m, i) => ({ ...m, key: i }))}
                             columns={[
                               { title: 'Medicine', dataIndex: 'name', key: 'name' },

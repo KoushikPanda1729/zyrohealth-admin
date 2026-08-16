@@ -1,12 +1,12 @@
 'use client';
 
 import React, { Suspense, useEffect, useState } from 'react';
-import { Layout, Menu, Button, Typography, theme, App, Modal, Spin } from 'antd';
+import { Layout, Menu, Button, Typography, theme, App, Modal, Spin, Drawer } from 'antd';
 import type { MenuProps } from 'antd';
 import {
   LogoutOutlined, MoonOutlined, SunOutlined, ShopOutlined, DashboardOutlined,
   ScanOutlined, MedicineBoxOutlined, ApartmentOutlined, ShoppingCartOutlined, FileTextOutlined, TeamOutlined,
-  WhatsAppOutlined, CarOutlined,
+  WhatsAppOutlined, CarOutlined, MenuOutlined,
 } from '@ant-design/icons';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { apiCall } from '../../lib/api';
@@ -41,8 +41,25 @@ function ShopLayoutInner({ children }: { children: React.ReactNode }) {
   const [tenantName, setTenantName] = useState<string | null>(null);
   const [impersonating, setImpersonating] = useState(false);
   const [isOwner, setIsOwner] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { token } = theme.useToken();
   const { isDark, toggle: toggleTheme } = useThemeMode();
+
+  // Below this width the 220px Sider would eat most of the viewport, so it's
+  // swapped for an off-canvas Drawer opened via the header hamburger.
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 768px)');
+    const applyMatch = (matches: boolean) => setIsMobile(matches);
+    applyMatch(mql.matches);
+    const handler = (e: MediaQueryListEvent) => applyMatch(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     // Quick-view bootstrap — a tenant admin's "Open Full View" opens a
@@ -151,60 +168,90 @@ function ShopLayoutInner({ children }: { children: React.ReactNode }) {
 
   if (!mounted) return null;
 
+  const sidebarBody = (
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '18px 16px' }}>
+        <div
+          style={{
+            width: 32, height: 32, background: '#1677ff', borderRadius: 8,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}
+        >
+          <ShopOutlined style={{ color: '#fff', fontSize: 16 }} />
+        </div>
+        <div style={{ overflow: 'hidden' }}>
+          <Text strong style={{ fontSize: 14, display: 'block', lineHeight: 1.2, whiteSpace: 'nowrap' }}>
+            {shopName ?? 'Shop Portal'}
+          </Text>
+          {tenantName && (
+            <Text type="secondary" style={{ fontSize: 11, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              Serving {tenantName}
+            </Text>
+          )}
+        </div>
+      </div>
+      <Menu
+        mode="inline"
+        theme={isDark ? 'dark' : 'light'}
+        selectedKeys={[pathname]}
+        items={MENU_ITEMS.filter((item) => !item.ownerOnly || isOwner).map(({ key, icon, label }) => ({ key, icon, label }))}
+        onClick={onMenuClick}
+      />
+    </>
+  );
+
   return (
     <App>
       <Layout style={{ minHeight: '100vh' }}>
-        <Sider theme={isDark ? 'dark' : 'light'} width={220} style={{ borderRight: `1px solid ${token.colorBorderSecondary}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '18px 16px' }}>
-            <div
-              style={{
-                width: 32, height: 32, background: '#1677ff', borderRadius: 8,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-              }}
-            >
-              <ShopOutlined style={{ color: '#fff', fontSize: 16 }} />
-            </div>
-            <div style={{ overflow: 'hidden' }}>
-              <Text strong style={{ fontSize: 14, display: 'block', lineHeight: 1.2, whiteSpace: 'nowrap' }}>
-                {shopName ?? 'Shop Portal'}
-              </Text>
-              {tenantName && (
-                <Text type="secondary" style={{ fontSize: 11, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  Serving {tenantName}
-                </Text>
-              )}
-            </div>
-          </div>
-          <Menu
-            mode="inline"
-            theme={isDark ? 'dark' : 'light'}
-            selectedKeys={[pathname]}
-            items={MENU_ITEMS.filter((item) => !item.ownerOnly || isOwner).map(({ key, icon, label }) => ({ key, icon, label }))}
-            onClick={onMenuClick}
-          />
-        </Sider>
+        {isMobile ? (
+          <Drawer
+            placement="left"
+            closable={false}
+            open={mobileNavOpen}
+            onClose={() => setMobileNavOpen(false)}
+            size={220}
+            styles={{ body: { padding: 0 } }}
+          >
+            {sidebarBody}
+          </Drawer>
+        ) : (
+          <Sider theme={isDark ? 'dark' : 'light'} width={220} style={{ borderRight: `1px solid ${token.colorBorderSecondary}` }}>
+            {sidebarBody}
+          </Sider>
+        )}
 
         <Layout>
           <Header
             style={{
               background: token.colorBgContainer,
-              padding: '0 24px',
+              padding: isMobile ? '0 12px' : '0 24px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: impersonating ? 'space-between' : 'flex-end',
+              justifyContent: impersonating && !isMobile ? 'space-between' : 'flex-end',
               boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
               position: 'sticky',
               top: 0,
               zIndex: 99,
+              gap: 8,
             }}
           >
-            {impersonating && (
+            {isMobile && (
+              <Button
+                type="text"
+                shape="circle"
+                icon={<MenuOutlined />}
+                onClick={() => setMobileNavOpen(true)}
+                title="Open menu"
+                style={{ marginRight: 'auto' }}
+              />
+            )}
+            {impersonating && !isMobile && (
               <Text style={{ fontSize: 13 }}>
                 Viewing as <Text strong style={{ color: token.colorWarningText }}>{shopName ?? 'this shop'}</Text>&apos;s portal (super admin session)
               </Text>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              {impersonating && (
+              {impersonating && !isMobile && (
                 <Button icon={<ApartmentOutlined />} onClick={handleSwitchBack}>
                   Switch back to Platform
                 </Button>
@@ -217,12 +264,33 @@ function ShopLayoutInner({ children }: { children: React.ReactNode }) {
                 title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
               />
               <Button type="text" danger icon={<LogoutOutlined />} onClick={handleLogout}>
-                Logout
+                {!isMobile && 'Logout'}
               </Button>
             </div>
           </Header>
 
-          <Content style={{ padding: 24, background: token.colorBgLayout, minHeight: 'calc(100vh - 64px)' }}>
+          {impersonating && isMobile && (
+            <div
+              style={{
+                background: token.colorWarningBg,
+                borderBottom: `1px solid ${token.colorWarningBorder}`,
+                padding: '6px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 8,
+              }}
+            >
+              <Text style={{ fontSize: 12 }}>
+                Viewing as <Text strong style={{ color: token.colorWarningText }}>{shopName ?? 'this shop'}</Text>&apos;s portal
+              </Text>
+              <Button size="small" icon={<ApartmentOutlined />} onClick={handleSwitchBack}>
+                Switch back
+              </Button>
+            </div>
+          )}
+
+          <Content style={{ padding: isMobile ? 12 : 24, background: token.colorBgLayout, minHeight: 'calc(100vh - 64px)' }}>
             {children}
           </Content>
         </Layout>

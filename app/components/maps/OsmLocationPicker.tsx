@@ -123,9 +123,12 @@ export default function OsmLocationPicker({
 
   return (
     <Space direction="vertical" style={{ width: '100%' }} size="middle">
-      <Space.Compact style={{ width: '100%' }}>
+      {/* flex+wrap instead of Space.Compact so the "Use my location" button
+          drops to its own line on narrow phones rather than squeezing the
+          search input into an unusable sliver */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, width: '100%' }}>
         <AutoComplete
-          style={{ width: '100%' }}
+          style={{ flex: '1 1 220px', minWidth: 0 }}
           value={searchQuery}
           onChange={setSearchQuery}
           onSearch={handleSearch}
@@ -137,10 +140,10 @@ export default function OsmLocationPicker({
           }))}
           placeholder="Search for an address or place..."
         />
-        <Button icon={<AimOutlined />} onClick={useMyLocation}>Use my location</Button>
-      </Space.Compact>
+        <Button icon={<AimOutlined />} onClick={useMyLocation} style={{ flexShrink: 0 }}>Use my location</Button>
+      </div>
 
-      <div style={{ height: 360, borderRadius: 8, overflow: 'hidden' }}>
+      <div style={{ width: '100%', height: 300, borderRadius: 8, overflow: 'hidden' }}>
         <MapContainer
           center={position ?? DEFAULT_CENTER}
           zoom={position ? 15 : 12}

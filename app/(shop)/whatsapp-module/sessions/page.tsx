@@ -186,6 +186,7 @@ export default function ShopWhatsAppSessionsPage() {
           pagination={{ current: pagination.current, pageSize: pagination.pageSize, total: pagination.total, showSizeChanger: false, showTotal: (t) => `${t} conversations` }}
           onChange={(p: TablePaginationConfig) => fetchSessions(p.current || 1)}
           bordered size="middle"
+          scroll={{ x: 'max-content' }}
         />
       )}
 

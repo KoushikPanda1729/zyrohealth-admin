@@ -336,7 +336,7 @@ export default function TenantsPage() {
           <Spin size="large" />
         </div>
       ) : (
-        <Table columns={columns} dataSource={tenants.map((t) => ({ ...t, key: t.id }))} bordered size="middle" />
+        <Table columns={columns} dataSource={tenants.map((t) => ({ ...t, key: t.id }))} bordered size="middle" scroll={{ x: 'max-content' }} />
       )}
 
       <Drawer

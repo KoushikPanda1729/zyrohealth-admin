@@ -182,6 +182,7 @@ export default function PaymentsPage() {
           onChange={handleTableChange}
           bordered
           size="middle"
+          scroll={{ x: 'max-content' }}
         />
       )}
     </div>

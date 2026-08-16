@@ -266,11 +266,11 @@ export default function PrescriptionRequestsPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 16 }}>
         <Title level={4} style={{ margin: 0 }}>
           <ScanOutlined style={{ marginRight: 8 }} />Prescription Requests
         </Title>
-        <Space>
+        <Space wrap>
           <Text type="secondary" style={{ fontSize: 13 }}>Auto-select cheapest quote</Text>
           <Switch checked={autoMode} loading={autoModeSaving} onChange={toggleAutoMode} />
         </Space>
@@ -291,7 +291,13 @@ export default function PrescriptionRequestsPage() {
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spin size="large" /></div>
       ) : (
-        <Table columns={columns} dataSource={requests.map((r) => ({ ...r, key: r.id }))} bordered size="middle" />
+        <Table
+          columns={columns}
+          dataSource={requests.map((r) => ({ ...r, key: r.id }))}
+          bordered
+          size="middle"
+          scroll={{ x: 'max-content' }}
+        />
       )}
 
       <Drawer

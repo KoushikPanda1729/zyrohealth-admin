@@ -181,7 +181,7 @@ export default function ArticlesPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 16 }}>
         <Title level={4} style={{ margin: 0 }}>
           <ReadOutlined style={{ marginRight: 8 }} />Articles
         </Title>
@@ -205,7 +205,7 @@ export default function ArticlesPage() {
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spin size="large" /></div>
       ) : (
-        <Table columns={columns} dataSource={articles.map((a) => ({ ...a, key: a.id }))} bordered size="middle" />
+        <Table columns={columns} dataSource={articles.map((a) => ({ ...a, key: a.id }))} bordered size="middle" scroll={{ x: 'max-content' }} />
       )}
 
       <Drawer

@@ -271,6 +271,7 @@ export default function DashboardPage() {
               dataSource={(data?.topDoctorsByRating || []).map((d) => ({ ...d, key: d.id }))}
               pagination={false}
               size="small"
+              scroll={{ x: 'max-content' }}
             />
           </Card>
         </Col>

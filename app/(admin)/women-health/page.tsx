@@ -44,15 +44,15 @@ function TipsEditor({ tips, onChange }: { tips: WomenHealthTip[]; onChange: (tip
     <Space direction="vertical" style={{ width: '100%' }} size="small">
       {tips.map((tip, i) => (
         <Space key={i} direction="vertical" style={{ width: '100%', border: '1px solid #303030', borderRadius: 8, padding: 10 }}>
-          <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', width: '100%', gap: 8, justifyContent: 'space-between' }}>
             <Input
               value={tip.title}
               onChange={(e) => update(i, 'title', e.target.value)}
               placeholder="Tip title"
-              style={{ width: 260 }}
+              style={{ flex: '1 1 160px', minWidth: 0 }}
             />
             <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(i)} />
-          </Space>
+          </div>
           <TextArea
             value={tip.body}
             onChange={(e) => update(i, 'body', e.target.value)}
@@ -244,7 +244,7 @@ export default function WomenHealthPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 16 }}>
         <Title level={4} style={{ margin: 0 }}>
           <WomanOutlined style={{ marginRight: 8 }} />Women&apos;s Health
         </Title>
@@ -268,7 +268,7 @@ export default function WomenHealthPage() {
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spin size="large" /></div>
       ) : (
-        <Table columns={columns} dataSource={categories.map((c) => ({ ...c, key: c.id }))} bordered size="middle" />
+        <Table columns={columns} dataSource={categories.map((c) => ({ ...c, key: c.id }))} bordered size="middle" scroll={{ x: 'max-content' }} />
       )}
 
       <Drawer
@@ -301,7 +301,7 @@ export default function WomenHealthPage() {
             <Text strong style={{ fontSize: 13 }}>Icon (emoji)</Text>
             <Input value={icon} onChange={(e) => setIcon(e.target.value)} placeholder="🩸" style={{ marginTop: 4 }} />
           </div>
-          <Space size="large">
+          <Space size="large" wrap>
             <div>
               <Text strong style={{ fontSize: 13, display: 'block', marginBottom: 4 }}>Gradient start</Text>
               <ColorPicker value={colorStart} onChange={(v) => setColorStart(v.toHexString())} showText />
@@ -357,7 +357,7 @@ export default function WomenHealthPage() {
             <Text strong style={{ fontSize: 13 }}>Icon (emoji)</Text>
             <Input value={editIcon} onChange={(e) => setEditIcon(e.target.value)} style={{ marginTop: 4 }} />
           </div>
-          <Space size="large">
+          <Space size="large" wrap>
             <div>
               <Text strong style={{ fontSize: 13, display: 'block', marginBottom: 4 }}>Gradient start</Text>
               <ColorPicker value={editColorStart} onChange={(v) => setEditColorStart(v.toHexString())} showText />

@@ -129,7 +129,7 @@ export default function ShopPayoutsPage() {
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spin size="large" /></div>
       ) : summaries.length > 0 && (
-        <Table columns={columns} dataSource={summaries.map((s) => ({ ...s, key: s.shopId }))} bordered size="middle" />
+        <Table columns={columns} dataSource={summaries.map((s) => ({ ...s, key: s.shopId }))} bordered size="middle" scroll={{ x: 'max-content' }} />
       )}
 
       <Drawer

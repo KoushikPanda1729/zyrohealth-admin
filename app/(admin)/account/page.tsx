@@ -45,6 +45,15 @@ export default function AccountPage() {
   const [form] = Form.useForm();
   const [passwordForm] = Form.useForm();
   const { token } = theme.useToken();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 768px)');
+    setIsMobile(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
 
   const fetchMe = async () => {
     setLoading(true);
@@ -167,6 +176,7 @@ export default function AccountPage() {
         <div
           style={{
             display: 'flex',
+            flexWrap: 'wrap',
             alignItems: 'center',
             gap: 18,
             paddingBottom: 20,
@@ -210,15 +220,15 @@ export default function AccountPage() {
               </div>
             </Upload>
           </div>
-          <div>
+          <div style={{ minWidth: 0, maxWidth: '100%' }}>
             <Text strong style={{ fontSize: 16, display: 'block' }}>{me?.fullName || 'Unnamed'}</Text>
-            <Text type="secondary" style={{ fontSize: 13, display: 'block' }}>{me?.email || me?.phoneNumber}</Text>
+            <Text type="secondary" style={{ fontSize: 13, display: 'block', wordBreak: 'break-word' }}>{me?.email || me?.phoneNumber}</Text>
             {me?.role && <Tag style={{ marginTop: 6 }}>{ROLE_LABELS[me.role] ?? me.role}</Tag>}
           </div>
         </div>
 
         <Tabs
-            tabPosition="left"
+            tabPosition={isMobile ? 'top' : 'left'}
             defaultActiveKey="profile"
             style={{ minHeight: 380 }}
             items={[
@@ -228,12 +238,12 @@ export default function AccountPage() {
                 children: (
                   <Form form={form} layout="vertical" onFinish={handleSave} style={{ maxWidth: 560 }}>
                     <Row gutter={16}>
-                      <Col span={12}>
+                      <Col xs={24} sm={24} md={12}>
                         <Form.Item label="Full Name" name="fullName" rules={[{ required: true, message: 'Name is required' }]}>
                           <Input placeholder="Your full name" />
                         </Form.Item>
                       </Col>
-                      <Col span={12}>
+                      <Col xs={24} sm={24} md={12}>
                         <Form.Item label="Email" name="email" rules={[{ type: 'email', message: 'Enter a valid email' }]}>
                           <Input prefix={<MailOutlined style={{ color: token.colorTextTertiary }} />} placeholder="you@example.com" />
                         </Form.Item>

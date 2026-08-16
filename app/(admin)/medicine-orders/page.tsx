@@ -195,6 +195,7 @@ export default function MedicineOrdersPage() {
           pagination={{ current: pagination.current, pageSize: pagination.pageSize, total: pagination.total, showSizeChanger: false, showTotal: (t) => `${t} orders` }}
           onChange={(p: TablePaginationConfig) => fetchOrders(p.current || 1)}
           bordered size="middle"
+          scroll={{ x: 'max-content' }}
         />
       )}
 
@@ -206,7 +207,7 @@ export default function MedicineOrdersPage() {
         destroyOnClose
         footer={
           selected ? (
-            <Space>
+            <Space wrap>
               {FORWARD_TRANSITIONS[selected.status].filter((s) => s !== 'cancelled').length > 0 && (
                 <>
                   <Select

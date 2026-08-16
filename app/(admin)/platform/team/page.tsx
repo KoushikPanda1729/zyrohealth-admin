@@ -135,7 +135,7 @@ export default function PlatformTeamPage() {
           <Spin size="large" />
         </div>
       ) : (
-        <Table columns={columns} dataSource={accounts.map((a) => ({ ...a, key: a.id }))} bordered size="middle" />
+        <Table columns={columns} dataSource={accounts.map((a) => ({ ...a, key: a.id }))} bordered size="middle" scroll={{ x: 'max-content' }} />
       )}
 
       <Drawer

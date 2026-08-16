@@ -203,11 +203,11 @@ export default function RolesPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16 }}>
         <Title level={4} style={{ margin: 0 }}>
           <SafetyCertificateOutlined style={{ marginRight: 8 }} />Roles &amp; Permissions
         </Title>
-        <Space>
+        <Space wrap>
           <Button icon={<UserAddOutlined />} onClick={openInvite} disabled={roles.length === 0}>Invite Staff</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>New Role</Button>
         </Space>
@@ -230,7 +230,7 @@ export default function RolesPage() {
           <Spin size="large" />
         </div>
       ) : (
-        <Table columns={columns} dataSource={roles.map((r) => ({ ...r, key: r.id }))} bordered size="middle" />
+        <Table columns={columns} dataSource={roles.map((r) => ({ ...r, key: r.id }))} bordered size="middle" scroll={{ x: 'max-content' }} />
       )}
 
       <Modal

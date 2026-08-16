@@ -109,7 +109,7 @@ export default function DepartmentsPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16 }}>
         <Title level={4} style={{ margin: 0 }}>
           <ClusterOutlined style={{ marginRight: 8 }} />Departments
         </Title>
@@ -133,7 +133,7 @@ export default function DepartmentsPage() {
           <Spin size="large" />
         </div>
       ) : (
-        <Table columns={columns} dataSource={departments.map((d) => ({ ...d, key: d.id }))} bordered size="middle" />
+        <Table columns={columns} dataSource={departments.map((d) => ({ ...d, key: d.id }))} bordered size="middle" scroll={{ x: 'max-content' }} />
       )}
 
       <Modal

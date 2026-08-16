@@ -134,7 +134,7 @@ export default function ShopOrdersPage() {
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spin size="large" /></div>
       ) : orders.length > 0 && (
-        <Table columns={columns} dataSource={orders.map((o) => ({ ...o, key: o.id }))} bordered size="middle" />
+        <Table columns={columns} dataSource={orders.map((o) => ({ ...o, key: o.id }))} bordered size="middle" scroll={{ x: 'max-content' }} />
       )}
 
       <Drawer

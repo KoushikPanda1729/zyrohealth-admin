@@ -251,7 +251,7 @@ export default function VoiceAgentsPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16 }}>
         <div>
           <Title level={4} style={{ margin: 0 }}>Voice Agent Phone Numbers</Title>
           <Text type="secondary" style={{ fontSize: 13 }}>
@@ -282,6 +282,7 @@ export default function VoiceAgentsPage() {
           onChange={(pag: TablePaginationConfig) => fetchNumbers(pag.current || 1)}
           bordered
           size="middle"
+          scroll={{ x: 'max-content' }}
         />
       )}
 

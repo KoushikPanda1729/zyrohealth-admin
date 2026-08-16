@@ -192,7 +192,7 @@ export default function TenantAdminsPage() {
           <Spin size="large" />
         </div>
       ) : (
-        <Table columns={columns} dataSource={admins.map((a) => ({ ...a, key: a.id }))} bordered size="middle" />
+        <Table columns={columns} dataSource={admins.map((a) => ({ ...a, key: a.id }))} bordered size="middle" scroll={{ x: 'max-content' }} />
       )}
 
       <Drawer

@@ -328,7 +328,7 @@ export default function MedicineShopsPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 16 }}>
         <Title level={4} style={{ margin: 0 }}>
           <ShopOutlined style={{ marginRight: 8 }} />Medicine Shops
         </Title>
@@ -356,7 +356,7 @@ export default function MedicineShopsPage() {
           <Spin size="large" />
         </div>
       ) : (
-        <Table columns={columns} dataSource={shops.map((s) => ({ ...s, key: s.id }))} bordered size="middle" />
+        <Table columns={columns} dataSource={shops.map((s) => ({ ...s, key: s.id }))} bordered size="middle" scroll={{ x: 'max-content' }} />
       )}
 
       {/* Onboard / Edit Drawer */}

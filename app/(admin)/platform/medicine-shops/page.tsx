@@ -398,7 +398,7 @@ export default function PlatformMedicineShopsPage() {
           <Spin size="large" />
         </div>
       ) : (
-        <Table columns={columns} dataSource={shops.map((s) => ({ ...s, key: s.id }))} bordered size="middle" />
+        <Table columns={columns} dataSource={shops.map((s) => ({ ...s, key: s.id }))} bordered size="middle" scroll={{ x: 'max-content' }} />
       )}
 
       {/* Onboards a genuinely standalone pharmacy — creates its own

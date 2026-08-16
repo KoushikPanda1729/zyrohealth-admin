@@ -268,6 +268,7 @@ export default function PrescriptionsPage() {
           pagination={{ current: pagination.current, pageSize: pagination.pageSize, total: pagination.total, showSizeChanger: false, showTotal: (t) => `${t} prescriptions` }}
           onChange={(p: TablePaginationConfig) => fetchPrescriptions(p.current || 1)}
           bordered size="middle"
+          scroll={{ x: 'max-content' }}
         />
       )}
 

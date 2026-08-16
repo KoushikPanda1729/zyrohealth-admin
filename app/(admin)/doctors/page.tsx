@@ -531,7 +531,7 @@ export default function DoctorsPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 16 }}>
         <Title level={4} style={{ margin: 0 }}>Doctors Management</Title>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
           Add Doctor
@@ -562,6 +562,7 @@ export default function DoctorsPage() {
           onChange={(pag: TablePaginationConfig) => fetchDoctors(pag.current || 1, statusFilter)}
           bordered
           size="middle"
+          scroll={{ x: 'max-content' }}
         />
       )}
 
@@ -574,7 +575,7 @@ export default function DoctorsPage() {
         onClose={() => setDrawerOpen(false)}
         extra={
           selectedDoctor && (
-            <Space>
+            <Space wrap>
               <Button size="small" icon={<EditOutlined />} onClick={openEditModal}>Edit</Button>
               {selectedDoctor.approvalStatus !== 'approved' && (
                 <Button type="primary" size="small" style={{ background: '#52c41a', borderColor: '#52c41a' }}
@@ -755,8 +756,8 @@ export default function DoctorsPage() {
 
             {/* Upload new document */}
             <Card size="small" style={{ borderRadius: 8, background: '#fafafa' }}>
-              <Row gutter={8} align="middle">
-                <Col span={7}>
+              <Row gutter={[8, 8]} align="middle">
+                <Col xs={24} sm={7}>
                   <Select
                     value={uploadDocType}
                     onChange={setUploadDocType}
@@ -765,7 +766,7 @@ export default function DoctorsPage() {
                     size="small"
                   />
                 </Col>
-                <Col span={8}>
+                <Col xs={24} sm={8}>
                   <Input
                     value={uploadNotes}
                     onChange={(e) => setUploadNotes(e.target.value)}
@@ -773,7 +774,7 @@ export default function DoctorsPage() {
                     size="small"
                   />
                 </Col>
-                <Col span={9}>
+                <Col xs={24} sm={9}>
                   <Upload
                     accept=".jpg,.jpeg,.png,.pdf"
                     showUploadList={false}
@@ -844,24 +845,24 @@ export default function DoctorsPage() {
               numeric fields are never auto-filled since they&apos;re real credentials you should enter yourself.
             </Text>
             <Row gutter={16}>
-              <Col span={12}>
+              <Col xs={24} sm={12}>
                 <Form.Item label={fieldLabel('Specialty', 'specialty')} name="specialty">
                   <Input placeholder="Cardiologist, General Physician…" />
                 </Form.Item>
               </Col>
-              <Col span={12}>
+              <Col xs={24} sm={12}>
                 <Form.Item label="License Number" name="licenseNumber">
                   <Input placeholder="MCI-123456" />
                 </Form.Item>
               </Col>
             </Row>
             <Row gutter={16}>
-              <Col span={12}>
+              <Col xs={24} sm={12}>
                 <Form.Item label="Years of Experience" name="yearsOfExperience">
                   <InputNumber min={0} max={60} style={{ width: '100%' }} placeholder="10" />
                 </Form.Item>
               </Col>
-              <Col span={12}>
+              <Col xs={24} sm={12}>
                 <Form.Item label="Consultation Fee (₹)" name="consultationFee">
                   <InputNumber min={0} style={{ width: '100%' }} placeholder="500" />
                 </Form.Item>
@@ -980,24 +981,24 @@ export default function DoctorsPage() {
       >
         <Form form={editForm} layout="vertical" style={{ marginTop: 16 }}>
           <Row gutter={16}>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item label="Specialty" name="specialty">
                 <Input placeholder="Cardiologist, General Physician…" />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item label="License Number" name="licenseNumber">
                 <Input placeholder="MCI-123456" />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={16}>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item label="Years of Experience" name="yearsOfExperience">
                 <InputNumber min={0} max={60} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item label="Consultation Fee (₹)" name="consultationFee">
                 <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>

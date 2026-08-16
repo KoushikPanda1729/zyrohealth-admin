@@ -920,7 +920,7 @@ export default function ShopCatalogPage() {
           Point your camera at a medicine&apos;s barcode. If it matches a SKU already on file, that medicine opens for
           editing; otherwise it opens Add Medicine with the code pre-filled.
         </Text>
-        <div id="barcode-scanner-region" />
+        <div id="barcode-scanner-region" style={{ width: '100%' }} />
       </Modal>
 
       <Modal

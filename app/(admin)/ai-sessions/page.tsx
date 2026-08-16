@@ -174,6 +174,7 @@ export default function AISessionsPage() {
           onChange={handleTableChange}
           bordered
           size="middle"
+          scroll={{ x: 'max-content' }}
         />
       )}
     </div>

@@ -249,11 +249,11 @@ export default function WhatsAppPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 16 }}>
         <Title level={4} style={{ margin: 0 }}>
           <WhatsAppOutlined style={{ marginRight: 8, color: '#25D366' }} />WhatsApp
         </Title>
-        <Space>
+        <Space wrap>
           <Button icon={<SettingOutlined />} onClick={openSettings}>Provider Settings</Button>
           <Button icon={<ApartmentOutlined />} onClick={() => router.push('/whatsapp/flows')}>
             Manage Flows
@@ -288,6 +288,7 @@ export default function WhatsAppPage() {
           pagination={{ current: pagination.current, pageSize: pagination.pageSize, total: pagination.total, showSizeChanger: false, showTotal: (t) => `${t} conversations` }}
           onChange={(p: TablePaginationConfig) => fetchSessions(p.current || 1)}
           bordered size="middle"
+          scroll={{ x: 'max-content' }}
         />
       )}
 

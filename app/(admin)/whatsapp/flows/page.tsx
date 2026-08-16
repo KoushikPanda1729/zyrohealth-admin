@@ -151,11 +151,11 @@ export default function WhatsAppFlowsPage() {
           { title: 'Flows' },
         ]}
       />
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 16 }}>
         <Title level={4} style={{ margin: 0 }}>
           <ApartmentOutlined style={{ marginRight: 8 }} />Conversation Flows
         </Title>
-        <Space>
+        <Space wrap>
           <Button icon={<ThunderboltOutlined />} onClick={() => setGenerating(true)}>Generate with AI</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreating(true)}>New Flow</Button>
         </Space>
@@ -178,7 +178,13 @@ export default function WhatsAppFlowsPage() {
           <Spin size="large" />
         </div>
       ) : (
-        <Table columns={columns} dataSource={flows.map((f) => ({ ...f, key: f.id }))} bordered size="middle" />
+        <Table
+          columns={columns}
+          dataSource={flows.map((f) => ({ ...f, key: f.id }))}
+          bordered
+          size="middle"
+          scroll={{ x: 'max-content' }}
+        />
       )}
 
       <Modal
