@@ -3,18 +3,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
-  ReactFlow, Background, Controls, MiniMap, Panel, Handle, Position,
+  ReactFlow, Background, Controls, ControlButton, Panel, Handle, Position, MarkerType,
   addEdge, useNodesState, useEdgesState,
-  type Node, type Edge, type Connection, type NodeProps,
+  type Node, type Edge, type Connection, type NodeProps, type DefaultEdgeOptions,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
-  Button, Drawer, Form, Input, Select, Space, Typography, message, Spin, Breadcrumb, Popconfirm, Divider, Modal,
+  Button, Drawer, Form, Input, Select, Space, Typography, message, Spin, Breadcrumb, Popconfirm, Divider, Modal, theme,
 } from 'antd';
 import {
   PlayCircleOutlined, MessageOutlined, MenuOutlined, RobotOutlined, BranchesOutlined,
   ApiOutlined, StarOutlined, CustomerServiceOutlined, StopOutlined, SaveOutlined,
-  PlusOutlined, DeleteOutlined, ThunderboltOutlined,
+  PlusOutlined, DeleteOutlined, ThunderboltOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
+  FullscreenOutlined, FullscreenExitOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import { apiCall } from '../../../../../lib/api';
@@ -57,6 +58,21 @@ const NODE_META: Record<FlowNodeType, { color: string; icon: React.ReactNode; la
   satisfaction: { color: '#fadb14', icon: <StarOutlined />, label: 'Satisfaction' },
   handoff: { color: '#f5222d', icon: <CustomerServiceOutlined />, label: 'Human Handoff' },
   end: { color: '#8c8c8c', icon: <StopOutlined />, label: 'End' },
+};
+
+interface PaletteGroup { title: string; subtitle?: string; types: FlowNodeType[] }
+
+const PALETTE_GROUPS: PaletteGroup[] = [
+  { title: 'Add Node', types: (Object.keys(NODE_META) as FlowNodeType[]).filter((t) => t !== 'start') },
+];
+
+// Animated + arrowed by default so a glance at the canvas shows conversation
+// direction — applies to every edge (loaded or newly connected) since
+// ReactFlow merges this under each edge's own fields at render time.
+const defaultEdgeOptions: DefaultEdgeOptions = {
+  animated: true,
+  style: { stroke: '#64748b', strokeWidth: 2 },
+  markerEnd: { type: MarkerType.ArrowClosed, color: '#64748b', width: 18, height: 18 },
 };
 
 function summaryText(data: FlowNodeData): string {
@@ -125,6 +141,108 @@ function FlowNode({ data, selected }: NodeProps) {
 
 const nodeTypes = { flowNode: FlowNode };
 
+// A floating, collapsible dark card so it reads consistently against the
+// canvas's own dark colorMode regardless of the shop portal's light/dark
+// theme — and collapses to a single icon button when the canvas needs
+// the room.
+function NodePalette({
+  groups, collapsed, onToggle, onAddNode,
+}: {
+  groups: PaletteGroup[];
+  collapsed: boolean;
+  onToggle: () => void;
+  onAddNode: (type: FlowNodeType) => void;
+}) {
+  if (collapsed) {
+    return (
+      <button onClick={onToggle} title="Show node palette" className="flow-palette-fab">
+        <MenuUnfoldOutlined />
+      </button>
+    );
+  }
+
+  return (
+    <div className="flow-palette">
+      <div className="flow-palette-header">
+        <span>Add Nodes</span>
+        <button onClick={onToggle} title="Collapse" className="flow-palette-collapse">
+          <MenuFoldOutlined style={{ fontSize: 12 }} />
+        </button>
+      </div>
+      <div className="flow-palette-body">
+        {groups.filter((g) => g.types.length > 0).map((group, gi, arr) => (
+          <div key={group.title} style={{ marginBottom: gi === arr.length - 1 ? 0 : 14 }}>
+            <div className="flow-palette-group-title">{group.title}</div>
+            {group.subtitle && <div className="flow-palette-group-subtitle">{group.subtitle}</div>}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {group.types.map((t) => {
+                const meta = NODE_META[t];
+                return (
+                  <button
+                    key={t}
+                    onClick={() => onAddNode(t)}
+                    title={`Add ${meta.label}`}
+                    className="flow-palette-btn"
+                    style={{ '--accent': meta.color } as React.CSSProperties}
+                  >
+                    <span className="flow-palette-btn-icon">{meta.icon}</span>
+                    {meta.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <style jsx>{`
+        .flow-palette-fab {
+          width: 36px; height: 36px; border-radius: 10px; border: 1px solid #263041;
+          background: #111827; color: #e5e7eb; display: flex; align-items: center;
+          justify-content: center; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+          transition: background 0.15s, border-color 0.15s;
+        }
+        .flow-palette-fab:hover { background: #1c283b; border-color: #3b4759; }
+        .flow-palette {
+          width: 252px; max-height: 82vh; display: flex; flex-direction: column;
+          background: #111827; border: 1px solid #1f2937; border-radius: 12px;
+          box-shadow: 0 8px 30px rgba(0,0,0,0.35); color: #e5e7eb; overflow: hidden;
+        }
+        .flow-palette-header {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 10px 12px; border-bottom: 1px solid #1f2937; flex-shrink: 0;
+          font-size: 12px; font-weight: 700; letter-spacing: 0.3px; color: #f9fafb;
+        }
+        .flow-palette-collapse {
+          width: 24px; height: 24px; border-radius: 6px; border: none; background: transparent;
+          color: #9ca3af; cursor: pointer; display: flex; align-items: center; justify-content: center;
+          transition: background 0.15s, color 0.15s;
+        }
+        .flow-palette-collapse:hover { background: #1f2937; color: #f9fafb; }
+        .flow-palette-body { padding: 10px; overflow-y: auto; }
+        .flow-palette-group-title {
+          font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase;
+          letter-spacing: 0.4px; margin-bottom: 6px;
+        }
+        .flow-palette-group-subtitle { font-size: 10.5px; color: #6b7280; margin: -4px 0 6px; line-height: 1.4; }
+        .flow-palette-btn {
+          display: flex; align-items: center; gap: 6px; padding: 5px 9px 5px 6px;
+          border-radius: 8px; border: 1px solid #263041; background: #161f2e;
+          color: #e5e7eb; font-size: 11.5px; cursor: pointer;
+          transition: background 0.15s, border-color 0.15s, transform 0.1s;
+        }
+        .flow-palette-btn:hover { background: #1c283b; border-color: var(--accent); }
+        .flow-palette-btn:active { transform: scale(0.96); }
+        .flow-palette-btn-icon {
+          width: 18px; height: 18px; border-radius: 5px; background: color-mix(in srgb, var(--accent) 22%, transparent);
+          color: var(--accent); display: flex; align-items: center; justify-content: center;
+          font-size: 11px; flex-shrink: 0;
+        }
+      `}</style>
+    </div>
+  );
+}
+
 let idCounter = 0;
 function nextId(prefix: string): string {
   idCounter += 1;
@@ -143,6 +261,7 @@ export default function ShopFlowEditorPage() {
   const params = useParams();
   const router = useRouter();
   const flowId = params.flowId as string;
+  const { token } = theme.useToken();
 
   const [flowName, setFlowName] = useState('');
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<FlowNodeData>>([]);
@@ -154,6 +273,17 @@ export default function ShopFlowEditorPage() {
   const [aiEditing, setAiEditing] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
+  const [paletteCollapsed, setPaletteCollapsed] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+
+  // Escape is the conventional way out of a fullscreen takeover — without
+  // this, a keyboard user has no way back short of reloading the page.
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') setFullscreen(false); };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [fullscreen]);
 
   const applyFlow = useCallback((flow: { name: string; definition: { nodes: unknown[]; edges: unknown[] } }) => {
     setFlowName(flow.name);
@@ -261,7 +391,16 @@ export default function ShopFlowEditorPage() {
   }
 
   return (
-    <div style={{ height: 'calc(100vh - 112px)', display: 'flex', flexDirection: 'column' }}>
+    <div
+      style={
+        fullscreen
+          ? {
+              position: 'fixed', inset: 0, zIndex: 900, background: token.colorBgLayout,
+              padding: 16, display: 'flex', flexDirection: 'column',
+            }
+          : { height: 'calc(100vh - 112px)', display: 'flex', flexDirection: 'column' }
+      }
+    >
       <Breadcrumb
         style={{ marginBottom: 12 }}
         items={[
@@ -282,7 +421,7 @@ export default function ShopFlowEditorPage() {
         </Space>
       </div>
 
-      <div style={{ flex: 1, width: '100%', border: '1px solid #f0f0f0', borderRadius: 8 }}>
+      <div style={{ flex: 1, width: '100%', minWidth: 0, border: '1px solid #1f2937', borderRadius: 8, overflow: 'hidden' }}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -292,24 +431,27 @@ export default function ShopFlowEditorPage() {
           nodeTypes={nodeTypes}
           onNodeClick={(_, node) => setSelectedNodeId(node.id)}
           onPaneClick={() => setSelectedNodeId(null)}
+          defaultEdgeOptions={defaultEdgeOptions}
+          colorMode="dark"
+          proOptions={{ hideAttribution: true }}
           fitView
         >
           <Background />
-          <Controls />
-          <MiniMap />
+          {/* Top-right — the node palette runs the full height of the left
+              side (ruling out bottom-left), and bottom-right can sit under
+              a global floating action button on some pages. */}
+          <Controls position="top-right">
+            <ControlButton onClick={() => setFullscreen((v) => !v)} title={fullscreen ? 'Exit full screen (Esc)' : 'Full screen'}>
+              {fullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
+            </ControlButton>
+          </Controls>
           <Panel position="top-left">
-            <Space direction="vertical" style={{ background: '#fff', padding: 8, borderRadius: 8, boxShadow: '0 1px 6px rgba(0,0,0,0.15)', maxHeight: '80vh', overflowY: 'auto' }}>
-              <Text strong style={{ fontSize: 12 }}>Add node</Text>
-              <Space wrap style={{ maxWidth: 220 }}>
-                {(Object.keys(NODE_META) as FlowNodeType[])
-                  .filter((t) => t !== 'start')
-                  .map((t) => (
-                    <Button key={t} size="small" icon={<PlusOutlined />} onClick={() => addNode(t)}>
-                      {NODE_META[t].label}
-                    </Button>
-                  ))}
-              </Space>
-            </Space>
+            <NodePalette
+              groups={PALETTE_GROUPS}
+              collapsed={paletteCollapsed}
+              onToggle={() => setPaletteCollapsed((v) => !v)}
+              onAddNode={addNode}
+            />
           </Panel>
         </ReactFlow>
       </div>

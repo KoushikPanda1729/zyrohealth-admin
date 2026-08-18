@@ -1,16 +1,16 @@
 'use client';
 
 import React, { Suspense, useEffect, useState } from 'react';
-import { Layout, Menu, Button, Typography, theme, App, Modal, Spin, Drawer } from 'antd';
+import { Layout, Menu, Button, Typography, theme, App, Modal, Spin, Drawer, Avatar, Dropdown } from 'antd';
 import type { MenuProps } from 'antd';
 import {
   LogoutOutlined, MoonOutlined, SunOutlined, ShopOutlined, DashboardOutlined,
   ScanOutlined, MedicineBoxOutlined, ApartmentOutlined, ShoppingCartOutlined, FileTextOutlined, TeamOutlined,
-  WhatsAppOutlined, CarOutlined, MenuOutlined,
+  WhatsAppOutlined, CarOutlined, MenuOutlined, UserOutlined, IdcardOutlined, DownOutlined,
 } from '@ant-design/icons';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { apiCall } from '../../lib/api';
-import { getStoredToken, getStoredUserRaw, clearStoredSession, hasSessionStorageSession } from '../../lib/session';
+import { getStoredToken, getStoredUserRaw, clearStoredSession, hasSessionStorageSession, activeStorage } from '../../lib/session';
 import { useThemeMode } from '../theme-context';
 
 const { Sider, Header, Content } = Layout;
@@ -39,6 +39,7 @@ function ShopLayoutInner({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [shopName, setShopName] = useState<string | null>(null);
   const [tenantName, setTenantName] = useState<string | null>(null);
+  const [userInfo, setUserInfo] = useState<{ fullName?: string; email?: string; avatarUrl?: string }>({});
   const [impersonating, setImpersonating] = useState(false);
   const [isOwner, setIsOwner] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -81,6 +82,8 @@ function ShopLayoutInner({ children }: { children: React.ReactNode }) {
     const storedUser = JSON.parse(getStoredUserRaw() || '{}') as {
       role?: string;
       fullName?: string;
+      email?: string;
+      avatarUrl?: string;
       shopStaffRole?: string;
     };
     if (!storedToken || storedUser.role !== 'shop') {
@@ -88,6 +91,7 @@ function ShopLayoutInner({ children }: { children: React.ReactNode }) {
       return;
     }
     setIsOwner(storedUser.shopStaffRole !== 'cashier');
+    setUserInfo({ fullName: storedUser.fullName, email: storedUser.email, avatarUrl: storedUser.avatarUrl });
     // "Switch back to Platform" only makes sense for the OLD same-tab
     // impersonation swap (Manage in Tenant), which stashes platformToken
     // in localStorage. A quick-view tab (Open Full View) is a completely
@@ -109,12 +113,39 @@ function ShopLayoutInner({ children }: { children: React.ReactNode }) {
         /* keep header minimal if this fails */
       }
     })();
+
+    // The avatarUrl cached in storage is a signed S3 URL that expires
+    // after an hour — same staleness issue the admin layout guards
+    // against. Re-fetch fresh on every mount instead of trusting the
+    // cached snapshot set above.
+    (async () => {
+      try {
+        const result = await apiCall('GET', '/api/auth/me');
+        const fresh = (result.data ?? result) as { fullName?: string; email?: string; avatarUrl?: string };
+        setUserInfo({ fullName: fresh.fullName, email: fresh.email, avatarUrl: fresh.avatarUrl });
+        activeStorage().setItem('user', JSON.stringify({ ...storedUser, ...fresh }));
+      } catch {
+        /* keep the storage snapshot already set above */
+      }
+    })();
     // Deliberately excludes searchParams/pathname — re-running this on the
     // router.replace() above (which clears the qv* params) would refire
     // the /api/shop/me fetch for no reason; the bootstrap only ever needs
     // to run once, on the tab's first mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
+
+  // The account page updates storage (name/email/avatar) after a save or
+  // photo upload, but this layout only reads it once at mount — without
+  // this listener the header would show stale info until a full reload.
+  useEffect(() => {
+    const handleUserUpdated = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { fullName?: string; email?: string; avatarUrl?: string };
+      setUserInfo((prev) => ({ ...prev, ...detail }));
+    };
+    window.addEventListener('healthplus:user-updated', handleUserUpdated);
+    return () => window.removeEventListener('healthplus:user-updated', handleUserUpdated);
+  }, []);
 
   const doLogout = () => {
     // Clears whichever storage this tab's session actually lives in — a
@@ -136,6 +167,28 @@ function ShopLayoutInner({ children }: { children: React.ReactNode }) {
   };
 
   const onMenuClick: MenuProps['onClick'] = (e) => router.push(e.key);
+
+  const userMenuItems: MenuProps['items'] = [
+    {
+      key: 'account-header',
+      label: (
+        <div style={{ padding: '2px 4px', minWidth: 180 }}>
+          <Text strong style={{ display: 'block', fontSize: 13 }}>{userInfo.fullName || 'My Account'}</Text>
+          {userInfo.email && <Text type="secondary" style={{ fontSize: 12 }}>{userInfo.email}</Text>}
+        </div>
+      ),
+      disabled: true,
+    },
+    { type: 'divider' },
+    { key: '/shop-account', icon: <IdcardOutlined />, label: 'My Account' },
+    { type: 'divider' },
+    { key: 'logout', icon: <LogoutOutlined />, label: 'Logout', danger: true },
+  ];
+
+  const handleUserMenuClick: MenuProps['onClick'] = ({ key }) => {
+    if (key === 'logout') handleLogout();
+    else if (key === '/shop-account') router.push('/shop-account');
+  };
 
   // Restores the super admin's own session, stashed by the platform
   // Medicine Shops page's "Manage in Tenant" before it swapped in this
@@ -169,8 +222,8 @@ function ShopLayoutInner({ children }: { children: React.ReactNode }) {
   if (!mounted) return null;
 
   const sidebarBody = (
-    <>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '18px 16px' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '18px 16px', flexShrink: 0 }}>
         <div
           style={{
             width: 32, height: 32, background: '#1677ff', borderRadius: 8,
@@ -190,14 +243,39 @@ function ShopLayoutInner({ children }: { children: React.ReactNode }) {
           )}
         </div>
       </div>
-      <Menu
-        mode="inline"
-        theme={isDark ? 'dark' : 'light'}
-        selectedKeys={[pathname]}
-        items={MENU_ITEMS.filter((item) => !item.ownerOnly || isOwner).map(({ key, icon, label }) => ({ key, icon, label }))}
-        onClick={onMenuClick}
-      />
-    </>
+
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+        <Menu
+          mode="inline"
+          theme={isDark ? 'dark' : 'light'}
+          selectedKeys={[pathname]}
+          items={MENU_ITEMS.filter((item) => !item.ownerOnly || isOwner).map(({ key, icon, label }) => ({ key, icon, label }))}
+          onClick={onMenuClick}
+        />
+      </div>
+
+      {/* Pinned logout footer, same as the admin portal's sidebar — always
+          visible without opening the header's account dropdown. */}
+      <div
+        style={{
+          flexShrink: 0,
+          borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : token.colorBorderSecondary}`,
+          padding: '8px 12px',
+        }}
+      >
+        <Button
+          type="text"
+          danger
+          block
+          icon={<LogoutOutlined />}
+          onClick={handleLogout}
+          title="Logout"
+          style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+        >
+          Logout
+        </Button>
+      </div>
+    </div>
   );
 
   return (
@@ -263,9 +341,31 @@ function ShopLayoutInner({ children }: { children: React.ReactNode }) {
                 onClick={toggleTheme}
                 title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
               />
-              <Button type="text" danger icon={<LogoutOutlined />} onClick={handleLogout}>
-                {!isMobile && 'Logout'}
-              </Button>
+              {!isMobile && <div style={{ width: 1, height: 24, background: token.colorBorderSecondary, margin: '0 8px' }} />}
+              <Dropdown
+                menu={{ items: userMenuItems, onClick: handleUserMenuClick }}
+                trigger={['click']}
+                placement="bottomRight"
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    cursor: 'pointer',
+                    padding: '4px 8px',
+                    borderRadius: 8,
+                  }}
+                >
+                  <Avatar size={30} src={userInfo.avatarUrl} icon={<UserOutlined />} />
+                  {!isMobile && (
+                    <Text style={{ fontSize: 13, maxWidth: 120 }} ellipsis>
+                      {userInfo.fullName || 'Account'}
+                    </Text>
+                  )}
+                  <DownOutlined style={{ fontSize: 10, color: token.colorTextTertiary }} />
+                </div>
+              </Dropdown>
             </div>
           </Header>
 

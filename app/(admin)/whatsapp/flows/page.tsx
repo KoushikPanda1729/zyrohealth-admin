@@ -2,15 +2,19 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  Table, Typography, Alert, Spin, Tag, Button, Space, Popconfirm, message, Modal, Input, Breadcrumb,
+  Table, Typography, Alert, Spin, Tag, Button, Space, Popconfirm, message, Modal, Drawer, Input, Breadcrumb, Card, Row, Col,
 } from 'antd';
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, StopOutlined, ApartmentOutlined,
-  ThunderboltOutlined,
+  ThunderboltOutlined, AppstoreOutlined, ArrowRightOutlined, EyeOutlined, ArrowLeftOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
+import { ReactFlow, Background, Controls } from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 import { apiCall } from '../../../../lib/api';
+import { FLOW_TEMPLATES } from './flow-templates';
+import { nodeTypes, defaultEdgeOptions, definitionToReactFlow } from './flow-node-meta';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -34,6 +38,9 @@ export default function WhatsAppFlowsPage() {
   const [genName, setGenName] = useState('');
   const [genPrompt, setGenPrompt] = useState('');
   const [genLoading, setGenLoading] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [templateBusyKey, setTemplateBusyKey] = useState<string | null>(null);
+  const [viewingKey, setViewingKey] = useState<string | null>(null);
 
   const fetchFlows = useCallback(async () => {
     setLoading(true);
@@ -61,6 +68,25 @@ export default function WhatsAppFlowsPage() {
       if (axios.isAxiosError(err)) message.error(err.response?.data?.message || 'Failed to create flow');
       else message.error('An unexpected error occurred');
     }
+  };
+
+  const applyTemplate = async (templateKey: string) => {
+    const template = FLOW_TEMPLATES.find((t) => t.key === templateKey);
+    if (!template) return;
+    setTemplateBusyKey(templateKey);
+    try {
+      const result = await apiCall('POST', '/api/admin/whatsapp/flows', {
+        name: template.name,
+        definition: template.definition,
+      });
+      const flow = result.data ?? result;
+      message.success('Flow created from template — review it before activating');
+      setTemplatesOpen(false);
+      router.push(`/whatsapp/flows/${flow.id}`);
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) message.error(err.response?.data?.message || 'Failed to create flow from template');
+      else message.error('An unexpected error occurred');
+    } finally { setTemplateBusyKey(null); }
   };
 
   const generateFlow = async () => {
@@ -156,6 +182,7 @@ export default function WhatsAppFlowsPage() {
           <ApartmentOutlined style={{ marginRight: 8 }} />Conversation Flows
         </Title>
         <Space wrap>
+          <Button icon={<AppstoreOutlined />} onClick={() => setTemplatesOpen(true)}>Templates</Button>
           <Button icon={<ThunderboltOutlined />} onClick={() => setGenerating(true)}>Generate with AI</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreating(true)}>New Flow</Button>
         </Space>
@@ -241,6 +268,97 @@ export default function WhatsAppFlowsPage() {
           </Text>
         </Space>
       </Modal>
+
+      <Drawer
+        title={
+          viewingKey ? (
+            <Space>
+              <Button size="small" icon={<ArrowLeftOutlined />} onClick={() => setViewingKey(null)} />
+              {FLOW_TEMPLATES.find((t) => t.key === viewingKey)?.name}
+            </Space>
+          ) : (
+            <span><AppstoreOutlined style={{ marginRight: 8 }} />Flow Templates</span>
+          )
+        }
+        open={templatesOpen}
+        onClose={() => { setTemplatesOpen(false); setViewingKey(null); }}
+        width={viewingKey ? 820 : 640}
+        styles={{ body: { padding: viewingKey ? 0 : 24, display: 'flex', flexDirection: 'column' } }}
+      >
+        {viewingKey ? (
+          (() => {
+            const template = FLOW_TEMPLATES.find((t) => t.key === viewingKey);
+            if (!template) return null;
+            const { nodes, edges } = definitionToReactFlow(template.definition);
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>{template.description}</Text>
+                </div>
+                <div style={{ flex: 1, minHeight: 400 }}>
+                  <ReactFlow
+                    nodes={nodes}
+                    edges={edges}
+                    nodeTypes={nodeTypes}
+                    defaultEdgeOptions={defaultEdgeOptions}
+                    nodesDraggable={false}
+                    nodesConnectable={false}
+                    elementsSelectable={false}
+                    panOnScroll
+                    fitView
+                  >
+                    <Background />
+                    <Controls showInteractive={false} />
+                  </ReactFlow>
+                </div>
+                <div style={{ padding: 16, borderTop: '1px solid #f0f0f0', textAlign: 'right' }}>
+                  <Button
+                    type="primary"
+                    icon={<ArrowRightOutlined />}
+                    loading={templateBusyKey === template.key}
+                    onClick={() => applyTemplate(template.key)}
+                  >
+                    Use this template
+                  </Button>
+                </div>
+              </div>
+            );
+          })()
+        ) : (
+          <>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+              Start from a ready-to-use conversation instead of a blank canvas — every node here is real,
+              already-working business logic (booking, prescriptions, AI, human handoff). View a template&apos;s flow
+              before committing, or drop it straight into the editor to review, tweak, or rewire before activating it.
+            </Text>
+            <Row gutter={[16, 16]}>
+              {FLOW_TEMPLATES.map((t) => (
+                <Col span={24} key={t.key}>
+                  <Card size="small" title={t.name}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>{t.description}</Text>
+                    <div style={{ marginTop: 12, textAlign: 'right' }}>
+                      <Space>
+                        <Button size="small" icon={<EyeOutlined />} onClick={() => setViewingKey(t.key)}>
+                          View
+                        </Button>
+                        <Button
+                          size="small"
+                          type="primary"
+                          icon={<ArrowRightOutlined />}
+                          loading={templateBusyKey === t.key}
+                          onClick={() => applyTemplate(t.key)}
+                        >
+                          Use this template
+                        </Button>
+                      </Space>
+                    </div>
+                  </Card>
+                </Col>
+              ))}
+            </Row>
+          </>
+        )}
+      </Drawer>
     </div>
   );
 }

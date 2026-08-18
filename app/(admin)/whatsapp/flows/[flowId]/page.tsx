@@ -3,168 +3,158 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
-  ReactFlow, Background, Controls, MiniMap, Panel, Handle, Position,
+  ReactFlow, Background, Controls, ControlButton, Panel,
   addEdge, useNodesState, useEdgesState,
-  type Node, type Edge, type Connection, type NodeProps,
+  type Node, type Edge, type Connection,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
-  Button, Drawer, Form, Input, Select, Space, Typography, message, Spin, Breadcrumb, Popconfirm, Divider, Modal,
+  Button, Drawer, Form, Input, Select, Space, Typography, message, Spin, Breadcrumb, Popconfirm, Divider, Modal, theme,
 } from 'antd';
 import {
-  PlayCircleOutlined, MessageOutlined, MenuOutlined, RobotOutlined, BranchesOutlined,
-  ApiOutlined, StarOutlined, CustomerServiceOutlined, StopOutlined, SaveOutlined,
-  PlusOutlined, DeleteOutlined, MedicineBoxOutlined, TeamOutlined, CalendarOutlined,
-  VideoCameraOutlined, DollarOutlined, CheckCircleOutlined, FileSearchOutlined,
-  ThunderboltOutlined, UploadOutlined, ClockCircleOutlined, ShopOutlined,
-  CreditCardOutlined, CarOutlined,
+  PlayCircleOutlined, SaveOutlined,
+  PlusOutlined, DeleteOutlined,
+  ThunderboltOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
+  FullscreenOutlined, FullscreenExitOutlined, SendOutlined, ReloadOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import { apiCall } from '../../../../../lib/api';
+import {
+  type FlowNodeType, type FlowNodeData,
+  NODE_META, PLATFORM_NODE_TYPES, PRESCRIPTION_NODE_TYPES, GENERIC_NODE_TYPES,
+  nodeTypes, defaultEdgeOptions,
+} from '../flow-node-meta';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 
-type FlowNodeType =
-  | 'start' | 'message' | 'buttons' | 'ai' | 'condition' | 'api_call' | 'satisfaction' | 'handoff' | 'end'
-  | 'platform_specialty_list' | 'platform_doctor_list' | 'platform_slot_list'
-  | 'platform_consultation_type' | 'platform_payment_method'
-  | 'platform_create_booking' | 'platform_order_status'
-  | 'upload_prescription' | 'await_shop_quotes' | 'select_quote'
-  | 'order_payment' | 'track_delivery';
+interface PreviewSessionState {
+  flowNodeId?: string | null;
+  activeFlowId?: string | null;
+  flowVariables?: Record<string, unknown>;
+  messages?: unknown[];
+}
 
-const PLATFORM_NODE_TYPES: FlowNodeType[] = [
-  'platform_specialty_list', 'platform_doctor_list', 'platform_slot_list',
-  'platform_consultation_type', 'platform_payment_method',
-  'platform_create_booking', 'platform_order_status',
-];
+interface PreviewStep {
+  stepType: string;
+  data: Record<string, unknown>;
+}
 
-// Same channel-agnostic node types run this over WhatsApp or the mobile
-// app — see whatsapp-flow-engine.service.ts's FlowSink abstraction.
-const PRESCRIPTION_NODE_TYPES: FlowNodeType[] = [
-  'upload_prescription', 'await_shop_quotes', 'select_quote',
-  'order_payment', 'track_delivery',
-];
-
-interface ButtonOption { id: string; label: string }
-interface ResponseMapping { variablePath: string; jsonPath: string }
-
-interface FlowNodeData extends Record<string, unknown> {
-  nodeType: FlowNodeType;
+interface PreviewMessage {
+  role: 'user' | 'assistant';
   text?: string;
-  options?: ButtonOption[];
-  systemPrompt?: string;
-  variablePath?: string;
-  operator?: 'equals' | 'contains' | 'exists';
-  value?: string;
-  url?: string;
-  method?: string;
-  body?: string;
-  responseMapping?: ResponseMapping[];
-  variableName?: string;
+  step?: PreviewStep;
 }
 
-const NODE_META: Record<FlowNodeType, { color: string; icon: React.ReactNode; label: string }> = {
-  start: { color: '#52c41a', icon: <PlayCircleOutlined />, label: 'Start' },
-  message: { color: '#1677ff', icon: <MessageOutlined />, label: 'Message' },
-  buttons: { color: '#722ed1', icon: <MenuOutlined />, label: 'Buttons' },
-  ai: { color: '#eb2f96', icon: <RobotOutlined />, label: 'AI Reply' },
-  condition: { color: '#fa8c16', icon: <BranchesOutlined />, label: 'Condition' },
-  api_call: { color: '#13c2c2', icon: <ApiOutlined />, label: 'API Call' },
-  satisfaction: { color: '#fadb14', icon: <StarOutlined />, label: 'Satisfaction' },
-  handoff: { color: '#f5222d', icon: <CustomerServiceOutlined />, label: 'Human Handoff' },
-  end: { color: '#8c8c8c', icon: <StopOutlined />, label: 'End' },
-  platform_specialty_list: { color: '#0d9488', icon: <MedicineBoxOutlined />, label: 'Specialty List' },
-  platform_doctor_list: { color: '#0d9488', icon: <TeamOutlined />, label: 'Doctor List' },
-  platform_slot_list: { color: '#0d9488', icon: <CalendarOutlined />, label: 'Slot List' },
-  platform_consultation_type: { color: '#0d9488', icon: <VideoCameraOutlined />, label: 'Consultation Type' },
-  platform_payment_method: { color: '#0d9488', icon: <DollarOutlined />, label: 'Payment Method' },
-  platform_create_booking: { color: '#0d9488', icon: <CheckCircleOutlined />, label: 'Create Booking' },
-  platform_order_status: { color: '#0d9488', icon: <FileSearchOutlined />, label: 'Order Status' },
-  upload_prescription: { color: '#7c3aed', icon: <UploadOutlined />, label: 'Upload Prescription' },
-  await_shop_quotes: { color: '#7c3aed', icon: <ClockCircleOutlined />, label: 'Await Quotes' },
-  select_quote: { color: '#7c3aed', icon: <ShopOutlined />, label: 'Select Quote' },
-  order_payment: { color: '#7c3aed', icon: <CreditCardOutlined />, label: 'Order Payment' },
-  track_delivery: { color: '#7c3aed', icon: <CarOutlined />, label: 'Track Delivery' },
-};
+interface PaletteGroup { title: string; subtitle?: string; types: FlowNodeType[] }
 
-function summaryText(data: FlowNodeData): string {
-  switch (data.nodeType) {
-    case 'message': return data.text || '(empty message)';
-    case 'buttons': return data.text || '(no prompt set)';
-    case 'ai': return data.systemPrompt ? `"${data.systemPrompt.slice(0, 50)}..."` : '(no system prompt)';
-    case 'condition': return data.variablePath ? `${data.variablePath} ${data.operator} ${data.value ?? ''}` : '(not configured)';
-    case 'api_call': return data.url ? `${data.method || 'GET'} ${data.url}` : '(no URL set)';
-    case 'satisfaction': return data.text || 'Rate 1-5';
-    case 'handoff': return data.text || 'Hands off to a human agent';
-    case 'platform_specialty_list': return 'Live list of specialties with available doctors';
-    case 'platform_doctor_list': return 'Live doctors for the chosen specialty';
-    case 'platform_slot_list': return 'Live upcoming availability for the chosen doctor';
-    case 'platform_consultation_type': return 'Asks Video Call vs In-Person Visit';
-    case 'platform_payment_method': return 'Asks Pay Online vs Pay Offline';
-    case 'platform_create_booking': return 'Creates the real booking (+ payment link if online)';
-    case 'platform_order_status': return "Looks up the patient's latest order/booking";
-    case 'upload_prescription': return 'Asks for a prescription photo and creates the request';
-    case 'await_shop_quotes': return 'Waits until a pharmacy quote is ready';
-    case 'select_quote': return 'Shows quotes and lets the patient pick one';
-    case 'order_payment': return 'Collects delivery address, creates the order, sends a payment link';
-    case 'track_delivery': return "Shows the order's live delivery status";
-    default: return '';
+const PALETTE_GROUPS: PaletteGroup[] = [
+  { title: 'Platform Data', subtitle: 'Live doctor/booking data — chain these to build a real booking flow', types: PLATFORM_NODE_TYPES },
+  { title: 'Prescription Flow', subtitle: 'Same channel-agnostic pipeline for WhatsApp or the app — chain these to build the upload-to-delivery journey', types: PRESCRIPTION_NODE_TYPES },
+  { title: 'Add Node', types: GENERIC_NODE_TYPES },
+];
+
+// A floating, collapsible dark card so it reads consistently against the
+// canvas's own dark colorMode regardless of the admin app's light/dark
+// theme — and collapses to a single icon button when the canvas needs
+// the room.
+function NodePalette({
+  groups, collapsed, onToggle, onAddNode,
+}: {
+  groups: PaletteGroup[];
+  collapsed: boolean;
+  onToggle: () => void;
+  onAddNode: (type: FlowNodeType) => void;
+}) {
+  if (collapsed) {
+    return (
+      <button onClick={onToggle} title="Show node palette" className="flow-palette-fab">
+        <MenuUnfoldOutlined />
+      </button>
+    );
   }
-}
-
-function FlowNode({ data, selected }: NodeProps) {
-  const nodeData = data as FlowNodeData;
-  const meta = NODE_META[nodeData.nodeType] ?? NODE_META.message;
-  const isStart = nodeData.nodeType === 'start';
-  const isEnd = nodeData.nodeType === 'end';
-  const isButtons = nodeData.nodeType === 'buttons';
-  const isCondition = nodeData.nodeType === 'condition';
-  const options = nodeData.options ?? [];
 
   return (
-    <div
-      style={{
-        border: `2px solid ${meta.color}`, borderRadius: 8, background: '#fff', minWidth: 200,
-        boxShadow: selected ? `0 0 0 3px ${meta.color}33` : '0 1px 4px rgba(0,0,0,0.1)',
-      }}
-    >
-      {!isStart && <Handle type="target" position={Position.Top} />}
-      <div style={{
-        background: meta.color, color: '#fff', padding: '5px 10px', borderRadius: '6px 6px 0 0',
-        display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600,
-      }}>
-        {meta.icon}{meta.label}
+    <div className="flow-palette">
+      <div className="flow-palette-header">
+        <span>Add Nodes</span>
+        <button onClick={onToggle} title="Collapse" className="flow-palette-collapse">
+          <MenuFoldOutlined style={{ fontSize: 12 }} />
+        </button>
       </div>
-      <div style={{ padding: '8px 10px', fontSize: 12, color: '#555', maxWidth: 220, overflowWrap: 'break-word' }}>
-        {summaryText(nodeData)}
+      <div className="flow-palette-body">
+        {groups.filter((g) => g.types.length > 0).map((group, gi, arr) => (
+          <div key={group.title} style={{ marginBottom: gi === arr.length - 1 ? 0 : 14 }}>
+            <div className="flow-palette-group-title">{group.title}</div>
+            {group.subtitle && <div className="flow-palette-group-subtitle">{group.subtitle}</div>}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {group.types.map((t) => {
+                const meta = NODE_META[t];
+                return (
+                  <button
+                    key={t}
+                    onClick={() => onAddNode(t)}
+                    title={`Add ${meta.label}`}
+                    className="flow-palette-btn"
+                    style={{ '--accent': meta.color } as React.CSSProperties}
+                  >
+                    <span className="flow-palette-btn-icon">{meta.icon}</span>
+                    {meta.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
 
-      {isButtons ? (
-        <div>
-          {options.length === 0 && (
-            <div style={{ padding: '4px 10px', fontSize: 11, color: '#aaa' }}>No options yet</div>
-          )}
-          {options.map((o, i) => (
-            <div key={o.id} style={{ position: 'relative', padding: '4px 10px', fontSize: 11, borderTop: '1px solid #f0f0f0' }}>
-              {i + 1}) {o.label || '(untitled)'}
-              <Handle type="source" position={Position.Right} id={o.id} style={{ top: '50%' }} />
-            </div>
-          ))}
-        </div>
-      ) : isCondition ? (
-        <div style={{ display: 'flex', justifyContent: 'space-around', padding: '6px 10px', fontSize: 11, borderTop: '1px solid #f0f0f0' }}>
-          <div style={{ position: 'relative' }}>True<Handle type="source" position={Position.Bottom} id="true" /></div>
-          <div style={{ position: 'relative' }}>False<Handle type="source" position={Position.Bottom} id="false" /></div>
-        </div>
-      ) : !isEnd ? (
-        <Handle type="source" position={Position.Bottom} />
-      ) : null}
+      <style jsx>{`
+        .flow-palette-fab {
+          width: 36px; height: 36px; border-radius: 10px; border: 1px solid #263041;
+          background: #111827; color: #e5e7eb; display: flex; align-items: center;
+          justify-content: center; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+          transition: background 0.15s, border-color 0.15s;
+        }
+        .flow-palette-fab:hover { background: #1c283b; border-color: #3b4759; }
+        .flow-palette {
+          width: 252px; max-height: 82vh; display: flex; flex-direction: column;
+          background: #111827; border: 1px solid #1f2937; border-radius: 12px;
+          box-shadow: 0 8px 30px rgba(0,0,0,0.35); color: #e5e7eb; overflow: hidden;
+        }
+        .flow-palette-header {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 10px 12px; border-bottom: 1px solid #1f2937; flex-shrink: 0;
+          font-size: 12px; font-weight: 700; letter-spacing: 0.3px; color: #f9fafb;
+        }
+        .flow-palette-collapse {
+          width: 24px; height: 24px; border-radius: 6px; border: none; background: transparent;
+          color: #9ca3af; cursor: pointer; display: flex; align-items: center; justify-content: center;
+          transition: background 0.15s, color 0.15s;
+        }
+        .flow-palette-collapse:hover { background: #1f2937; color: #f9fafb; }
+        .flow-palette-body { padding: 10px; overflow-y: auto; }
+        .flow-palette-group-title {
+          font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase;
+          letter-spacing: 0.4px; margin-bottom: 6px;
+        }
+        .flow-palette-group-subtitle { font-size: 10.5px; color: #6b7280; margin: -4px 0 6px; line-height: 1.4; }
+        .flow-palette-btn {
+          display: flex; align-items: center; gap: 6px; padding: 5px 9px 5px 6px;
+          border-radius: 8px; border: 1px solid #263041; background: #161f2e;
+          color: #e5e7eb; font-size: 11.5px; cursor: pointer;
+          transition: background 0.15s, border-color 0.15s, transform 0.1s;
+        }
+        .flow-palette-btn:hover { background: #1c283b; border-color: var(--accent); }
+        .flow-palette-btn:active { transform: scale(0.96); }
+        .flow-palette-btn-icon {
+          width: 18px; height: 18px; border-radius: 5px; background: color-mix(in srgb, var(--accent) 22%, transparent);
+          color: var(--accent); display: flex; align-items: center; justify-content: center;
+          font-size: 11px; flex-shrink: 0;
+        }
+      `}</style>
     </div>
   );
 }
-
-const nodeTypes = { flowNode: FlowNode };
 
 let idCounter = 0;
 function nextId(prefix: string): string {
@@ -184,6 +174,7 @@ export default function FlowEditorPage() {
   const params = useParams();
   const router = useRouter();
   const flowId = params.flowId as string;
+  const { token } = theme.useToken();
 
   const [flowName, setFlowName] = useState('');
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<FlowNodeData>>([]);
@@ -195,6 +186,28 @@ export default function FlowEditorPage() {
   const [aiEditing, setAiEditing] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
+  const [paletteCollapsed, setPaletteCollapsed] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+
+  // ── Preview — runs the CURRENT (possibly unsaved) canvas definition
+  // through the real flow engine, one turn per message, so whoever's
+  // building this can confirm "yes, this is what I want" before saving or
+  // going live. Fully client-held conversation state (sessionState),
+  // roundtripped to the stateless preview endpoint each turn. ────────────
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewMessages, setPreviewMessages] = useState<PreviewMessage[]>([]);
+  const [previewSessionState, setPreviewSessionState] = useState<PreviewSessionState | undefined>(undefined);
+  const [previewInput, setPreviewInput] = useState('');
+  const [previewSending, setPreviewSending] = useState(false);
+
+  // Escape is the conventional way out of a fullscreen takeover — without
+  // this, a keyboard user has no way back short of reloading the page.
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') setFullscreen(false); };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [fullscreen]);
 
   const applyFlow = useCallback((flow: { name: string; definition: { nodes: unknown[]; edges: unknown[] } }) => {
     setFlowName(flow.name);
@@ -257,18 +270,56 @@ export default function FlowEditorPage() {
 
   const selectedNode = useMemo(() => nodes.find((n) => n.id === selectedNodeId) ?? null, [nodes, selectedNodeId]);
 
+  const buildDefinition = useCallback(() => ({
+    nodes: nodes.map((n) => ({
+      id: n.id,
+      type: n.data.nodeType,
+      position: n.position,
+      data: (({ nodeType: _nt, ...rest }) => rest)(n.data),
+    })),
+    edges: edges.map((e) => ({ id: e.id, source: e.source, target: e.target, sourceHandle: e.sourceHandle ?? null })),
+  }), [nodes, edges]);
+
+  const resetPreview = () => {
+    setPreviewMessages([]);
+    setPreviewSessionState(undefined);
+    setPreviewInput('');
+  };
+
+  const openPreview = () => {
+    resetPreview();
+    setPreviewOpen(true);
+  };
+
+  const sendPreviewMessage = async (text: string) => {
+    if (!text.trim() || previewSending) return;
+    setPreviewSending(true);
+    setPreviewMessages((prev) => [...prev, { role: 'user', text }]);
+    setPreviewInput('');
+    try {
+      const result = await apiCall('POST', '/api/admin/whatsapp/flows/preview', {
+        definition: buildDefinition(),
+        text,
+        sessionState: previewSessionState,
+      });
+      const data = (result.data ?? result) as { steps: PreviewStep[]; sessionState: PreviewSessionState };
+      setPreviewSessionState(data.sessionState);
+      const newMessages: PreviewMessage[] = data.steps.map((step) =>
+        step.stepType === 'text'
+          ? { role: 'assistant', text: (step.data['text'] as string | undefined) ?? '' }
+          : { role: 'assistant', step },
+      );
+      setPreviewMessages((prev) => [...prev, ...newMessages]);
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) message.error(err.response?.data?.message || 'Preview failed');
+      else message.error('An unexpected error occurred');
+    } finally { setPreviewSending(false); }
+  };
+
   const save = async () => {
     setSaving(true);
     try {
-      const definition = {
-        nodes: nodes.map((n) => ({
-          id: n.id,
-          type: n.data.nodeType,
-          position: n.position,
-          data: (({ nodeType: _nt, ...rest }) => rest)(n.data),
-        })),
-        edges: edges.map((e) => ({ id: e.id, source: e.source, target: e.target, sourceHandle: e.sourceHandle ?? null })),
-      };
+      const definition = buildDefinition();
       await apiCall('PATCH', `/api/admin/whatsapp/flows/${flowId}`, { name: flowName, definition });
       message.success('Flow saved');
     } catch (err: unknown) {
@@ -302,7 +353,16 @@ export default function FlowEditorPage() {
   }
 
   return (
-    <div style={{ height: 'calc(100vh - 112px)', display: 'flex', flexDirection: 'column' }}>
+    <div
+      style={
+        fullscreen
+          ? {
+              position: 'fixed', inset: 0, zIndex: 900, background: token.colorBgLayout,
+              padding: 16, display: 'flex', flexDirection: 'column',
+            }
+          : { height: 'calc(100vh - 112px)', display: 'flex', flexDirection: 'column' }
+      }
+    >
       <Breadcrumb
         style={{ marginBottom: 12 }}
         items={[
@@ -318,12 +378,13 @@ export default function FlowEditorPage() {
           style={{ maxWidth: 320, width: '100%', fontWeight: 600 }}
         />
         <Space wrap>
+          <Button icon={<PlayCircleOutlined />} onClick={openPreview}>Preview</Button>
           <Button icon={<ThunderboltOutlined />} onClick={() => setAiEditing(true)}>Edit with AI</Button>
           <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={save}>Save</Button>
         </Space>
       </div>
 
-      <div style={{ flex: 1, width: '100%', minWidth: 0, border: '1px solid #f0f0f0', borderRadius: 8 }}>
+      <div style={{ flex: 1, width: '100%', minWidth: 0, border: '1px solid #1f2937', borderRadius: 8, overflow: 'hidden' }}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -333,47 +394,29 @@ export default function FlowEditorPage() {
           nodeTypes={nodeTypes}
           onNodeClick={(_, node) => setSelectedNodeId(node.id)}
           onPaneClick={() => setSelectedNodeId(null)}
+          defaultEdgeOptions={defaultEdgeOptions}
+          colorMode="dark"
+          proOptions={{ hideAttribution: true }}
           fitView
         >
           <Background />
-          <Controls />
-          <MiniMap />
+          {/* Top-right — the node palette runs the full height of the left
+              side (ruling out bottom-left), and bottom-right sits directly
+              under the global "Edit with AI" assistant FAB (see
+              StudioAssistant in app/(admin)/layout.tsx), which would hide
+              the last control button behind it. */}
+          <Controls position="top-right">
+            <ControlButton onClick={() => setFullscreen((v) => !v)} title={fullscreen ? 'Exit full screen (Esc)' : 'Full screen'}>
+              {fullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
+            </ControlButton>
+          </Controls>
           <Panel position="top-left">
-            <Space direction="vertical" style={{ background: '#fff', padding: 8, borderRadius: 8, boxShadow: '0 1px 6px rgba(0,0,0,0.15)', maxHeight: '80vh', overflowY: 'auto' }}>
-              <Text strong style={{ fontSize: 12 }}>Platform Data</Text>
-              <Text type="secondary" style={{ fontSize: 10, display: 'block', marginTop: -6 }}>
-                Live doctor/booking data — chain these to build a real booking flow
-              </Text>
-              <Space wrap style={{ maxWidth: 240 }}>
-                {PLATFORM_NODE_TYPES.map((t) => (
-                  <Button key={t} size="small" icon={<PlusOutlined />} onClick={() => addNode(t)}>
-                    {NODE_META[t].label}
-                  </Button>
-                ))}
-              </Space>
-              <Text strong style={{ fontSize: 12, marginTop: 8, display: 'block' }}>Prescription Flow</Text>
-              <Text type="secondary" style={{ fontSize: 10, display: 'block', marginTop: -6 }}>
-                Same channel-agnostic pipeline for WhatsApp or the mobile app — chain these to build the
-                upload-to-delivery journey
-              </Text>
-              <Space wrap style={{ maxWidth: 240 }}>
-                {PRESCRIPTION_NODE_TYPES.map((t) => (
-                  <Button key={t} size="small" icon={<PlusOutlined />} onClick={() => addNode(t)}>
-                    {NODE_META[t].label}
-                  </Button>
-                ))}
-              </Space>
-              <Text strong style={{ fontSize: 12, marginTop: 8, display: 'block' }}>Add node</Text>
-              <Space wrap style={{ maxWidth: 220 }}>
-                {(Object.keys(NODE_META) as FlowNodeType[])
-                  .filter((t) => t !== 'start' && !PLATFORM_NODE_TYPES.includes(t) && !PRESCRIPTION_NODE_TYPES.includes(t))
-                  .map((t) => (
-                    <Button key={t} size="small" icon={<PlusOutlined />} onClick={() => addNode(t)}>
-                      {NODE_META[t].label}
-                    </Button>
-                  ))}
-              </Space>
-            </Space>
+            <NodePalette
+              groups={PALETTE_GROUPS}
+              collapsed={paletteCollapsed}
+              onToggle={() => setPaletteCollapsed((v) => !v)}
+              onAddNode={addNode}
+            />
           </Panel>
         </ReactFlow>
       </div>
@@ -422,6 +465,104 @@ export default function FlowEditorPage() {
           </Text>
         </Space>
       </Modal>
+
+      <Drawer
+        title={<span><PlayCircleOutlined style={{ marginRight: 8, color: '#52c41a' }} />Preview</span>}
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        size={420}
+        extra={<Button size="small" icon={<ReloadOutlined />} onClick={resetPreview}>Reset</Button>}
+        styles={{ body: { display: 'flex', flexDirection: 'column', padding: 0 } }}
+      >
+        <Text type="secondary" style={{ fontSize: 12, padding: '0 16px', display: 'block', marginBottom: 12 }}>
+          Runs the canvas exactly as it is right now — including any unsaved changes — through the real engine.
+          Data-driven steps (bookings, prescription requests) really happen, against one dedicated test patient.
+        </Text>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {previewMessages.length === 0 && (
+            <Text type="secondary" style={{ fontSize: 13 }}>
+              Say &quot;hi&quot; to start — same greeting a real user would send.
+            </Text>
+          )}
+          {previewMessages.map((m, i) => (
+            <PreviewBubble key={i} message={m} onOptionClick={(label) => void sendPreviewMessage(label)} />
+          ))}
+          {previewSending && <Spin size="small" />}
+        </div>
+        <div style={{ display: 'flex', gap: 8, padding: 16, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <Input
+            value={previewInput}
+            onChange={(e) => setPreviewInput(e.target.value)}
+            onPressEnter={() => void sendPreviewMessage(previewInput)}
+            placeholder='Type a message, e.g. "hi"'
+            disabled={previewSending}
+          />
+          <Button
+            type="primary"
+            icon={<SendOutlined />}
+            loading={previewSending}
+            onClick={() => void sendPreviewMessage(previewInput)}
+          />
+        </div>
+      </Drawer>
+    </div>
+  );
+}
+
+function PreviewBubble({
+  message: m, onOptionClick,
+}: {
+  message: PreviewMessage;
+  onOptionClick: (label: string) => void;
+}) {
+  const isUser = m.role === 'user';
+  const bubbleStyle: React.CSSProperties = {
+    alignSelf: isUser ? 'flex-end' : 'flex-start',
+    maxWidth: '85%',
+    padding: '8px 12px',
+    borderRadius: 12,
+    background: isUser ? '#199A8E' : 'rgba(255,255,255,0.08)',
+    color: isUser ? '#fff' : 'inherit',
+    fontSize: 13,
+    whiteSpace: 'pre-wrap',
+  };
+
+  if (m.text !== undefined) {
+    return <div style={bubbleStyle}>{m.text || <Text type="secondary" style={{ fontSize: 12 }}>(empty)</Text>}</div>;
+  }
+
+  const step = m.step;
+  if (!step) return null;
+
+  if (step.stepType === 'options' && Array.isArray(step.data['options'])) {
+    const options = step.data['options'] as { id: string; title: string; description?: string }[];
+    return (
+      <div style={{ alignSelf: 'flex-start', maxWidth: '90%', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={bubbleStyle}>{step.data['text'] as string}</div>
+        <Space direction="vertical" style={{ width: '100%' }} size={4}>
+          {options.map((o) => (
+            <Button key={o.id} size="small" onClick={() => onOptionClick(o.title)} style={{ textAlign: 'left' }}>
+              {o.title}
+            </Button>
+          ))}
+        </Space>
+      </div>
+    );
+  }
+
+  // Any other structured step (upload_prescription, select_quote, order_payment,
+  // track_delivery, ...) — a generic system-style card rather than bespoke UI
+  // for every step type, since this is for confirming flow logic, not a
+  // polished end-user experience.
+  return (
+    <div style={{
+      alignSelf: 'flex-start', maxWidth: '90%', padding: '8px 12px', borderRadius: 8,
+      border: '1px dashed rgba(255,255,255,0.2)', fontSize: 11, fontFamily: 'monospace',
+    }}>
+      <div style={{ marginBottom: 4, fontWeight: 600 }}>⚙ {step.stepType}</div>
+      {Object.keys(step.data).length > 0 && (
+        <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{JSON.stringify(step.data, null, 2)}</pre>
+      )}
     </div>
   );
 }
@@ -641,6 +782,10 @@ function NodeConfigForm({
           <code>consultationType</code>, and <code>payOnline</code> from earlier nodes — same booking logic the app
           itself uses, including the WhatsApp payment link when paying online. Place a Specialty List → Doctor List
           → Slot List → Consultation Type → Payment Method chain before this node.
+          <br /><br />
+          If the patient already has an active booking with this doctor, it offers to cancel/reschedule that one
+          instead of a dead-end error — wire an outgoing edge with source handle <code>conflict</code> to a
+          Manage Booking node to enable this (falls back to a plain error message if not wired).
         </Text>
       );
 
@@ -649,6 +794,18 @@ function NodeConfigForm({
         <Text type="secondary">
           Looks up the patient&apos;s latest medicine order and booking status and replies with it — same data as
           the hardcoded bot&apos;s status check.
+        </Text>
+      );
+
+    case 'platform_manage_booking':
+      return (
+        <Text type="secondary">
+          If the patient has an upcoming (not cancelled/completed) booking, offers to cancel or reschedule it —
+          reuses the same <code>cancelBooking</code> logic (and its &quot;not within 2 hours of the appointment&quot;
+          rule) the app&apos;s own booking screen uses. No configuration needed. Wire up to 3 outgoing edges by
+          source handle: <code>cancel</code>, <code>reschedule</code> (chain into a Slot List node for the same
+          doctor), and <code>keep</code> (used as the fallback for everything else too — no upcoming booking,
+          declined, etc.).
         </Text>
       );
 
