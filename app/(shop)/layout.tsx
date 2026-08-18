@@ -85,8 +85,13 @@ function ShopLayoutInner({ children }: { children: React.ReactNode }) {
       email?: string;
       avatarUrl?: string;
       shopStaffRole?: string;
+      // Only present when a tenant admin opened their OWN in-house shop's
+      // full view — they're logged in as themselves (role stays 'admin'),
+      // this claim is what actually grants shop-portal access. See
+      // AdminService.impersonateShop / attachRole.middleware.ts.
+      actingShopId?: string;
     };
-    if (!storedToken || storedUser.role !== 'shop') {
+    if (!storedToken || (storedUser.role !== 'shop' && !storedUser.actingShopId)) {
       router.push('/shop-login');
       return;
     }

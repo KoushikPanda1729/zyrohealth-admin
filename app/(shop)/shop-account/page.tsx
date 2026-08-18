@@ -28,12 +28,20 @@ interface Me {
   shopStaffRole?: 'owner' | 'cashier';
 }
 
-// Shop accounts are still just `User` rows with role === 'shop' — the
+// Shop accounts are usually just `User` rows with role === 'shop' — the
 // meaningful distinction for them is shopStaffRole, not the generic role
-// label every other portal shows.
+// label every other portal shows. The one exception: a tenant admin
+// viewing their OWN in-house shop is logged in as themselves (role stays
+// 'admin', see AdminService.impersonateShop), so this correctly falls
+// through to their real role label instead.
+const ROLE_LABELS: Record<string, string> = {
+  super_admin: 'Super Admin',
+  admin: 'Admin',
+};
+
 const roleLabel = (me: Me): string => {
   if (me.role === 'shop') return me.shopStaffRole === 'owner' ? 'Shop Owner' : 'Shop Staff';
-  return me.role;
+  return ROLE_LABELS[me.role] ?? me.role;
 };
 
 export default function ShopAccountPage() {
