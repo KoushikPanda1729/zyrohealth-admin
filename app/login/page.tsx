@@ -9,6 +9,7 @@ import {
 import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { useThemeMode } from '../theme-context';
+import { PolicyLinksFooter } from '../components/PolicyLinksFooter';
 
 const { Title, Text } = Typography;
 
@@ -297,6 +298,8 @@ function LoginForm() {
               </Button>
             </Form.Item>
           </Form>
+
+          <PolicyLinksFooter />
         </div>
       </div>
 
