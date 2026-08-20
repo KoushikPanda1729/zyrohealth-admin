@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   Table, Typography, Alert, Spin, Tag, Button, Space, message, Drawer, Modal, Form, Input,
-  InputNumber, Select, DatePicker, List, Empty, Tabs, Descriptions, Divider, Card, Statistic, Row, Col, Tooltip,
+  InputNumber, Select, DatePicker, List, Empty, Tabs, Segmented, Descriptions, Divider, Card, Statistic, Row, Col, Tooltip, theme,
 } from 'antd';
 import {
   PlusOutlined, FileTextOutlined, TeamOutlined, ShoppingOutlined, DollarOutlined,
-  SafetyCertificateOutlined, DeleteOutlined, EyeOutlined, CreditCardOutlined, BarcodeOutlined, BarChartOutlined,
+  DeleteOutlined, EyeOutlined, CreditCardOutlined, BarcodeOutlined, BarChartOutlined,
+  SearchOutlined, InfoCircleOutlined, ShoppingCartOutlined, WalletOutlined,
 } from '@ant-design/icons';
 import type { Html5QrcodeScanner } from 'html5-qrcode';
 import dayjs from 'dayjs';
@@ -121,6 +122,10 @@ const PAYMENT_MODE_OPTIONS: { value: PaymentMode; label: string }[] = [
   { value: 'credit', label: 'Credit (bill to customer)' },
 ];
 
+const PAYMENT_MODE_COLORS: Record<PaymentMode, string> = {
+  cash: 'green', upi: 'blue', card: 'purple', credit: 'orange',
+};
+
 function formatRs(cents: number): string {
   return `Rs.${(cents / 100).toFixed(2)}`;
 }
@@ -143,11 +148,52 @@ interface SaleFormValues {
   note?: string;
 }
 
+function StepHeading({ step, children, noMargin }: { step: number; children: React.ReactNode; noMargin?: boolean }) {
+  const { token } = theme.useToken();
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: noMargin ? 0 : 12 }}>
+      <span
+        style={{
+          width: 22, height: 22, borderRadius: '50%', background: token.colorPrimary, color: '#fff',
+          fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        }}
+      >
+        {step}
+      </span>
+      <Text strong style={{ fontSize: 13 }}>{children}</Text>
+    </div>
+  );
+}
+
+function StatCard({ icon, color, title, value, suffix, footnote }: {
+  icon: React.ReactNode; color: string; title: string; value: string | number; suffix?: string; footnote?: React.ReactNode;
+}) {
+  return (
+    <Card size="small">
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <div
+          style={{
+            width: 40, height: 40, borderRadius: 10, background: `${color}1f`, color,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0,
+          }}
+        >
+          {icon}
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <Statistic title={title} value={value} suffix={suffix} valueStyle={{ color }} />
+          {footnote}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 export default function BillingPage() {
+  const { token } = theme.useToken();
   const [activeTab, setActiveTab] = useState('new-sale');
   // Reconciliation/Analytics are owner-only on the backend
-  // (requireShopOwner.middleware.ts) — hide the tabs to match rather than
-  // let a cashier click into a tab that just 403s.
+  // (requireShopOwner.middleware.ts) — hide the Reports tab entirely to
+  // match rather than let a cashier click into a tab that just 403s.
   const [isOwner, setIsOwner] = useState(true);
   useEffect(() => {
     try {
@@ -178,12 +224,18 @@ export default function BillingPage() {
   const [customerFormOpen, setCustomerFormOpen] = useState(false);
   const [customerForm] = Form.useForm<{ name: string; phone?: string; address?: string }>();
   const [customerSaving, setCustomerSaving] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState('');
 
   const [ledgerFor, setLedgerFor] = useState<CustomerRow | null>(null);
   const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [paymentForm] = Form.useForm<{ amount: number; note?: string }>();
   const [paymentSaving, setPaymentSaving] = useState(false);
+
+  const [salesSearch, setSalesSearch] = useState('');
+  const [salesPaymentFilter, setSalesPaymentFilter] = useState<PaymentMode | undefined>(undefined);
+
+  const [reportView, setReportView] = useState<'reconciliation' | 'analytics' | 'h1-register'>('reconciliation');
 
   const [reconDate, setReconDate] = useState(dayjs());
   const [reconciliation, setReconciliation] = useState<ReconciliationSummary | null>(null);
@@ -247,11 +299,24 @@ export default function BillingPage() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'reconciliation') void fetchReconciliation(reconDate.format('YYYY-MM-DD'));
-    if (activeTab === 'h1-register') void fetchH1();
-    if (activeTab === 'analytics') void fetchAnalytics(analyticsRange[0].format('YYYY-MM-DD'), analyticsRange[1].format('YYYY-MM-DD'));
+    if (activeTab !== 'reports') return;
+    if (reportView === 'reconciliation') void fetchReconciliation(reconDate.format('YYYY-MM-DD'));
+    if (reportView === 'h1-register') void fetchH1();
+    if (reportView === 'analytics') void fetchAnalytics(analyticsRange[0].format('YYYY-MM-DD'), analyticsRange[1].format('YYYY-MM-DD'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
+  }, [activeTab, reportView]);
+
+  // ── At-a-glance stats — computed client-side from data every shop user
+  // (not just the owner) can already see, so they show up regardless of
+  // permission, unlike the gated Reports tab. ─────────────────────────────
+  const todayStats = useMemo(() => {
+    const todayStr = dayjs().format('YYYY-MM-DD');
+    const todaySales = sales.filter((s) => dayjs(s.createdAt).format('YYYY-MM-DD') === todayStr);
+    const revenueCents = todaySales.reduce((sum, s) => sum + s.totalCents, 0);
+    const totalDueCents = customers.reduce((sum, c) => sum + c.outstandingDueCents, 0);
+    const customersWithDue = customers.filter((c) => c.outstandingDueCents > 0).length;
+    return { count: todaySales.length, revenueCents, totalDueCents, customersWithDue };
+  }, [sales, customers]);
 
   // ── New Sale computations (live preview as the form changes) ─────────
   const resolveItem = (formItem: SaleFormItem): CatalogItemOption | undefined =>
@@ -433,6 +498,22 @@ export default function BillingPage() {
     } finally { setPaymentSaving(false); }
   };
 
+  const filteredSales = useMemo(() => {
+    const q = salesSearch.trim().toLowerCase();
+    return sales.filter((s) => {
+      if (salesPaymentFilter && s.paymentMode !== salesPaymentFilter) return false;
+      if (!q) return true;
+      const customerName = (s.customerNameSnapshot || customers.find((c) => c.id === s.customerId)?.name || '').toLowerCase();
+      return String(s.invoiceNumber).includes(q) || customerName.includes(q);
+    });
+  }, [sales, salesSearch, salesPaymentFilter, customers]);
+
+  const filteredCustomers = useMemo(() => {
+    const q = customerSearch.trim().toLowerCase();
+    if (!q) return customers;
+    return customers.filter((c) => c.name.toLowerCase().includes(q) || (c.phone ?? '').includes(q));
+  }, [customers, customerSearch]);
+
   const saleColumns = [
     { title: 'Invoice #', dataIndex: 'invoiceNumber', key: 'invoiceNumber' },
     { title: 'Date', dataIndex: 'createdAt', key: 'createdAt', render: (v: string) => dayjs(v).format('DD MMM YYYY, h:mm A') },
@@ -440,8 +521,8 @@ export default function BillingPage() {
       title: 'Customer', key: 'customer',
       render: (_: unknown, s: SaleRow) => s.customerNameSnapshot || customers.find((c) => c.id === s.customerId)?.name || <Text type="secondary">Walk-in</Text>,
     },
-    { title: 'Payment', dataIndex: 'paymentMode', key: 'paymentMode', render: (v: PaymentMode) => <Tag>{v.toUpperCase()}</Tag> },
-    { title: 'Total', dataIndex: 'totalCents', key: 'totalCents', render: (v: number) => formatRs(v) },
+    { title: 'Payment', dataIndex: 'paymentMode', key: 'paymentMode', render: (v: PaymentMode) => <Tag color={PAYMENT_MODE_COLORS[v]}>{v.toUpperCase()}</Tag> },
+    { title: 'Total', dataIndex: 'totalCents', key: 'totalCents', render: (v: number) => <Text strong>{formatRs(v)}</Text> },
     {
       title: 'Actions', key: 'actions',
       render: (_: unknown, s: SaleRow) => (
@@ -480,322 +561,442 @@ export default function BillingPage() {
 
   return (
     <div>
-      <Title level={4} style={{ margin: '0 0 12px' }}>
+      <Title level={4} style={{ margin: '0 0 4px' }}>
         <FileTextOutlined style={{ marginRight: 8 }} />Billing
       </Title>
+      <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+        Ring up a sale, track what customers owe you, and see how the shop is doing.
+      </Text>
 
       {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} />}
 
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spin size="large" /></div>
       ) : (
-        <Tabs
-          activeKey={activeTab}
-          onChange={setActiveTab}
-          items={([
-            {
-              key: 'new-sale',
-              label: <span><ShoppingOutlined /> New Sale</span>,
-              children: (
-                <div style={{ maxWidth: 720 }}>
-                  <Form form={form} layout="vertical" onFinish={submitSale}>
-                    <Space.Compact style={{ width: '100%' }}>
-                      <Form.Item label="Customer (optional for cash/UPI/card)" name="customerId" style={{ width: '100%' }}>
-                        <Select
-                          allowClear
-                          showSearch
-                          placeholder="Walk-in customer"
-                          optionFilterProp="label"
-                          options={customers.map((c) => ({ value: c.id, label: `${c.name}${c.phone ? ` (${c.phone})` : ''}` }))}
-                        />
-                      </Form.Item>
-                    </Space.Compact>
+        <>
+          <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
+            <Col xs={24} sm={8}>
+              <StatCard
+                icon={<ShoppingCartOutlined />}
+                color={token.colorPrimary}
+                title="Sales Today"
+                value={todayStats.count}
+                suffix="invoices"
+              />
+            </Col>
+            <Col xs={24} sm={8}>
+              <StatCard
+                icon={<DollarOutlined />}
+                color={token.colorSuccess}
+                title="Revenue Today"
+                value={formatRs(todayStats.revenueCents)}
+              />
+            </Col>
+            <Col xs={24} sm={8}>
+              <StatCard
+                icon={<WalletOutlined />}
+                color={todayStats.totalDueCents > 0 ? token.colorError : token.colorTextTertiary}
+                title="Outstanding Dues"
+                value={formatRs(todayStats.totalDueCents)}
+                footnote={todayStats.customersWithDue > 0 && (
+                  <Text type="secondary" style={{ fontSize: 12 }}>across {todayStats.customersWithDue} customer{todayStats.customersWithDue > 1 ? 's' : ''}</Text>
+                )}
+              />
+            </Col>
+          </Row>
 
-                    <Form.List name="items">
-                      {(fields, { add, remove }) => (
-                        <>
-                          <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 8 }}>
-                            <Text strong style={{ fontSize: 13 }}>Items</Text>
-                            <Button size="small" icon={<BarcodeOutlined />} onClick={() => setBarcodeOpen(true)}>
-                              Scan Barcode
-                            </Button>
-                          </Space>
-                          {fields.map(({ key, name, ...rest }) => {
-                            const formItem = (watchedItems as SaleFormItem[])[name] ?? { quantity: 1 };
-                            const preview = linePreview(formItem);
-                            const catalogItem = resolveItem(formItem);
-                            return (
-                              <div key={key} style={{ marginBottom: 8, padding: 8, border: '1px solid #d9d9d9', borderRadius: 6 }}>
-                                <Space align="baseline" wrap style={{ width: '100%' }}>
-                                  <Form.Item {...rest} name={[name, 'catalogItemId']} style={{ marginBottom: 4, width: 220 }}>
-                                    <Select
-                                      showSearch
-                                      placeholder="Select medicine"
-                                      optionFilterProp="label"
-                                      options={catalogItems.map((c) => ({
-                                        value: c.id,
-                                        label: `${c.name} (${c.quantity} ${c.unit} left)`,
-                                        disabled: c.quantity <= 0,
-                                      }))}
-                                    />
-                                  </Form.Item>
-                                  <Form.Item {...rest} name={[name, 'quantity']} initialValue={1} rules={[{ required: true, message: 'Qty required' }]} style={{ marginBottom: 4, width: 90 }}>
-                                    <InputNumber min={1} max={catalogItem?.quantity} placeholder="Qty" style={{ width: '100%' }} />
-                                  </Form.Item>
-                                  <Button icon={<DeleteOutlined />} danger onClick={() => remove(name)} />
-                                </Space>
-                                {catalogItem && (
-                                  <Text type="secondary" style={{ fontSize: 12 }}>
-                                    {formatRs(catalogItem.priceCents)}/{catalogItem.unit} · GST {catalogItem.gstRatePercent}%
-                                    {catalogItem.isControlledDrug && <Tag color="red" style={{ marginLeft: 6 }}>Schedule H1</Tag>}
-                                    {' · line total '}{formatRs(preview.lineTotalCents)}
-                                  </Text>
-                                )}
-                              </div>
-                            );
-                          })}
-                          <Button type="dashed" onClick={() => add({ quantity: 1 })} block icon={<PlusOutlined />}>
-                            Add Item
-                          </Button>
-                        </>
-                      )}
-                    </Form.List>
-
-                    <Divider />
-
-                    <Descriptions column={1} size="small" style={{ marginBottom: 16 }}>
-                      <Descriptions.Item label="Subtotal">{formatRs(previewTotals.subtotal)}</Descriptions.Item>
-                      <Descriptions.Item label="GST">{formatRs(previewTotals.gst)}</Descriptions.Item>
-                      <Descriptions.Item label={<Text strong>Total</Text>}><Text strong style={{ fontSize: 16 }}>{formatRs(previewTotals.total)}</Text></Descriptions.Item>
-                    </Descriptions>
-
-                    {hasControlledDrugInCart && (
-                      <>
-                        <Alert
-                          type="warning"
-                          showIcon
-                          message="Schedule H1 medicine in cart — patient and doctor details are required by law"
-                          style={{ marginBottom: 12 }}
-                        />
-                        <Space.Compact style={{ width: '100%' }}>
-                          <Form.Item label="Patient Name" name="patientName" rules={[{ required: true, message: 'Required' }]} style={{ width: '50%' }}>
-                            <Input />
-                          </Form.Item>
-                          <Form.Item label="Patient Address (optional)" name="patientAddress" style={{ width: '50%' }}>
-                            <Input />
-                          </Form.Item>
-                        </Space.Compact>
-                        <Space.Compact style={{ width: '100%' }}>
-                          <Form.Item label="Doctor Name" name="doctorName" rules={[{ required: true, message: 'Required' }]} style={{ width: '50%' }}>
-                            <Input />
-                          </Form.Item>
-                          <Form.Item label="Doctor Registration No." name="doctorRegNo" rules={[{ required: true, message: 'Required' }]} style={{ width: '50%' }}>
-                            <Input />
-                          </Form.Item>
-                        </Space.Compact>
-                      </>
-                    )}
-
-                    <Form.Item label="Payment Mode" name="paymentMode" rules={[{ required: true }]} initialValue="cash">
-                      <Select options={PAYMENT_MODE_OPTIONS} />
-                    </Form.Item>
-
-                    {watchedPaymentMode === 'credit' && (
-                      <>
-                        {!watchedCustomerId && (
-                          <Alert type="error" showIcon message="A credit sale must be billed to a customer — select one above" style={{ marginBottom: 12 }} />
-                        )}
-                        <Form.Item
-                          label="Amount Paid Now (optional, rest becomes due)"
-                          name="amountPaidCents"
-                          extra={`Total is ${formatRs(previewTotals.total)} — leave blank if nothing is paid upfront`}
-                        >
-                          <InputNumber min={0} max={previewTotals.total / 100} style={{ width: '100%' }} prefix="Rs." />
+          <Tabs
+            activeKey={activeTab}
+            onChange={setActiveTab}
+            items={([
+              {
+                key: 'new-sale',
+                label: <span><ShoppingOutlined /> New Sale</span>,
+                children: (
+                  <div style={{ maxWidth: 720 }}>
+                    <Form form={form} layout="vertical" onFinish={submitSale}>
+                      <Card size="small" style={{ marginBottom: 16 }}>
+                        <StepHeading step={1}>Who&apos;s this for?</StepHeading>
+                        <Form.Item label="Customer (optional for cash/UPI/card)" name="customerId" style={{ marginBottom: 0 }}>
+                          <Select
+                            allowClear
+                            showSearch
+                            placeholder="Walk-in customer"
+                            optionFilterProp="label"
+                            options={customers.map((c) => ({ value: c.id, label: `${c.name}${c.phone ? ` (${c.phone})` : ''}` }))}
+                          />
                         </Form.Item>
-                      </>
-                    )}
+                      </Card>
 
-                    <Form.Item label="Note (optional)" name="note">
-                      <Input.TextArea rows={2} />
-                    </Form.Item>
+                      <Card size="small" style={{ marginBottom: 16 }}>
+                        <Form.List name="items">
+                          {(fields, { add, remove }) => (
+                            <>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+                                <StepHeading step={2} noMargin>What are they buying?</StepHeading>
+                                <Button size="small" icon={<BarcodeOutlined />} onClick={() => setBarcodeOpen(true)}>
+                                  Scan Barcode
+                                </Button>
+                              </div>
+                              {fields.length === 0 && (
+                                <Empty description="Add a medicine to start the sale" style={{ margin: '12px 0' }} />
+                              )}
+                              {fields.map(({ key, name, ...rest }) => {
+                                const formItem = (watchedItems as SaleFormItem[])[name] ?? { quantity: 1 };
+                                const preview = linePreview(formItem);
+                                const catalogItem = resolveItem(formItem);
+                                return (
+                                  <div key={key} style={{ marginBottom: 8, padding: 10, background: token.colorFillTertiary, border: `1px solid ${token.colorBorderSecondary}`, borderRadius: 8 }}>
+                                    <Space align="baseline" wrap style={{ width: '100%' }}>
+                                      <Form.Item {...rest} name={[name, 'catalogItemId']} style={{ marginBottom: 4, width: 220 }}>
+                                        <Select
+                                          showSearch
+                                          placeholder="Select medicine"
+                                          optionFilterProp="label"
+                                          options={catalogItems.map((c) => ({
+                                            value: c.id,
+                                            label: `${c.name} (${c.quantity} ${c.unit} left)`,
+                                            disabled: c.quantity <= 0,
+                                          }))}
+                                        />
+                                      </Form.Item>
+                                      <Form.Item {...rest} name={[name, 'quantity']} initialValue={1} rules={[{ required: true, message: 'Qty required' }]} style={{ marginBottom: 4, width: 90 }}>
+                                        <InputNumber min={1} max={catalogItem?.quantity} placeholder="Qty" style={{ width: '100%' }} />
+                                      </Form.Item>
+                                      <Button type="text" icon={<DeleteOutlined />} danger onClick={() => remove(name)} />
+                                    </Space>
+                                    {catalogItem && (
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Text type="secondary" style={{ fontSize: 12 }}>
+                                          {formatRs(catalogItem.priceCents)}/{catalogItem.unit} · GST {catalogItem.gstRatePercent}%
+                                          {catalogItem.isControlledDrug && (
+                                            <Tooltip title="A prescription/controlled medicine — patient &amp; doctor details will be required below">
+                                              <Tag color="red" style={{ marginLeft: 6 }}>Prescription required</Tag>
+                                            </Tooltip>
+                                          )}
+                                        </Text>
+                                        <Text strong style={{ fontSize: 13 }}>{formatRs(preview.lineTotalCents)}</Text>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              <Button type="dashed" onClick={() => add({ quantity: 1 })} block icon={<PlusOutlined />}>
+                                Add Item
+                              </Button>
+                            </>
+                          )}
+                        </Form.List>
 
-                    <Button
-                      type="primary"
-                      htmlType="submit"
-                      loading={saving}
-                      disabled={watchedPaymentMode === 'credit' && !watchedCustomerId}
-                      block
-                    >
-                      Complete Sale
-                    </Button>
-                  </Form>
-                </div>
-              ),
-            },
-            {
-              key: 'sales',
-              label: <span><FileTextOutlined /> Sales</span>,
-              children: (
-                <Table columns={saleColumns} dataSource={sales.map((s) => ({ ...s, key: s.id }))} bordered size="middle" scroll={{ x: true }} />
-              ),
-            },
-            {
-              key: 'customers',
-              label: <span><TeamOutlined /> Customers</span>,
-              children: (
-                <div>
-                  <Button type="primary" icon={<PlusOutlined />} onClick={openCustomerForm} style={{ marginBottom: 12 }}>
-                    New Customer
-                  </Button>
-                  <Table columns={customerColumns} dataSource={customers.map((c) => ({ ...c, key: c.id }))} bordered size="middle" scroll={{ x: 'max-content' }} />
-                </div>
-              ),
-            },
-            {
-              key: 'reconciliation',
-              label: <span><DollarOutlined /> Reconciliation</span>,
-              children: (
-                <div style={{ maxWidth: 480 }}>
-                  <DatePicker
-                    value={reconDate}
-                    onChange={(d) => { const picked = d ?? dayjs(); setReconDate(picked); void fetchReconciliation(picked.format('YYYY-MM-DD')); }}
-                    style={{ marginBottom: 16 }}
-                  />
-                  {reconLoading ? (
-                    <Spin />
-                  ) : reconciliation ? (
-                    <>
-                      <Table
-                        pagination={false}
-                        bordered
-                        size="small"
-                        scroll={{ x: 'max-content' }}
-                        dataSource={PAYMENT_MODE_OPTIONS.map((m) => ({
-                          key: m.value,
-                          mode: m.label,
-                          count: reconciliation.byPaymentMode[m.value].count,
-                          total: reconciliation.byPaymentMode[m.value].totalCents,
-                        }))}
-                        columns={[
-                          { title: 'Payment Mode', dataIndex: 'mode', key: 'mode' },
-                          { title: 'Sales', dataIndex: 'count', key: 'count' },
-                          { title: 'Collected', dataIndex: 'total', key: 'total', render: (v: number) => formatRs(v) },
-                        ]}
-                      />
-                      <Descriptions column={1} size="small" style={{ marginTop: 16 }}>
-                        <Descriptions.Item label="Old dues settled today">{formatRs(reconciliation.creditCollectedTodayCents)}</Descriptions.Item>
-                        <Descriptions.Item label={<Text strong>Total cash/collections in hand today</Text>}>
-                          <Text strong style={{ fontSize: 16 }}>{formatRs(reconciliation.grandTotalCents)}</Text>
-                        </Descriptions.Item>
-                      </Descriptions>
-                    </>
-                  ) : (
-                    <Empty description="No data" />
-                  )}
-                </div>
-              ),
-            },
-            {
-              key: 'h1-register',
-              label: <span><SafetyCertificateOutlined /> H1 Register</span>,
-              children: h1Loading ? (
-                <Spin />
-              ) : h1Rows.length === 0 ? (
-                <Alert type="info" showIcon message="No Schedule H1 sales recorded yet" />
-              ) : (
-                <Table columns={h1Columns} dataSource={h1Rows.map((s) => ({ ...s, key: s.id }))} bordered size="small" scroll={{ x: true }} />
-              ),
-            },
-            {
-              key: 'analytics',
-              label: <span><BarChartOutlined /> Analytics</span>,
-              children: (
-                <div>
-                  <DatePicker.RangePicker
-                    value={analyticsRange}
-                    onChange={(range) => {
-                      if (!range || !range[0] || !range[1]) return;
-                      const picked: [Dayjs, Dayjs] = [range[0], range[1]];
-                      setAnalyticsRange(picked);
-                      void fetchAnalytics(picked[0].format('YYYY-MM-DD'), picked[1].format('YYYY-MM-DD'));
-                    }}
-                    style={{ marginBottom: 16 }}
-                  />
-                  {analyticsLoading ? (
-                    <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spin size="large" /></div>
-                  ) : !analytics ? (
-                    <Empty description="No data" />
-                  ) : (
-                    <>
-                      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-                        <Col xs={24} sm={12} md={8}>
-                          <Card size="small"><Statistic title="Revenue" value={formatRs(analytics.totalRevenueCents)} /></Card>
-                        </Col>
-                        <Col xs={24} sm={12} md={8}>
-                          <Card size="small"><Statistic title="GST Collected" value={formatRs(analytics.totalGstCents)} /></Card>
-                        </Col>
-                        <Col xs={24} sm={12} md={8}>
-                          <Card size="small"><Statistic title="Invoices" value={analytics.saleCount} /></Card>
-                        </Col>
-                      </Row>
+                        <Divider style={{ margin: '16px 0 12px' }} />
 
-                      <Text strong style={{ display: 'block', marginBottom: 8 }}>Revenue by Day</Text>
-                      {analytics.revenueByDay.length === 0 ? (
-                        <Empty description="No sales in this range" style={{ marginBottom: 24 }} />
-                      ) : (
-                        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 140, marginBottom: 24, overflowX: 'auto', padding: '0 4px' }}>
-                          {analytics.revenueByDay.map((d) => {
-                            const maxRevenue = Math.max(...analytics.revenueByDay.map((x) => x.revenueCents), 1);
-                            const heightPct = Math.max((d.revenueCents / maxRevenue) * 100, 4);
-                            return (
-                              <Tooltip key={d.date} title={`${dayjs(d.date).format('DD MMM')} — ${formatRs(d.revenueCents)} (${d.saleCount} sale${d.saleCount > 1 ? 's' : ''})`}>
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 28, flexShrink: 0 }}>
-                                  <div style={{ width: 20, height: `${heightPct}%`, background: '#1677ff', borderRadius: 3, minHeight: 4 }} />
-                                  <Text style={{ fontSize: 9, marginTop: 4, whiteSpace: 'nowrap' }}>{dayjs(d.date).format('D MMM')}</Text>
-                                </div>
-                              </Tooltip>
-                            );
-                          })}
+                        <div style={{ background: token.colorPrimaryBg, border: `1px solid ${token.colorPrimaryBorder}`, borderRadius: 8, padding: '12px 16px' }}>
+                          <Descriptions column={1} size="small">
+                            <Descriptions.Item label="Subtotal">{formatRs(previewTotals.subtotal)}</Descriptions.Item>
+                            <Descriptions.Item label="GST">{formatRs(previewTotals.gst)}</Descriptions.Item>
+                          </Descriptions>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                            <Text strong style={{ fontSize: 14 }}>Total to Collect</Text>
+                            <Text strong style={{ fontSize: 22, color: token.colorPrimary }}>{formatRs(previewTotals.total)}</Text>
+                          </div>
                         </div>
+                      </Card>
+
+                      {hasControlledDrugInCart && (
+                        <Card size="small" style={{ marginBottom: 16, borderColor: '#faad14' }}>
+                          <Alert
+                            type="warning"
+                            showIcon
+                            message="This sale includes a controlled/prescription medicine (Schedule H1)"
+                            description="Indian law requires the patient and prescribing doctor's details to be recorded for this sale — they'll show up later in your Controlled Drug Register."
+                            style={{ marginBottom: 12 }}
+                          />
+                          <Space.Compact style={{ width: '100%' }}>
+                            <Form.Item label="Patient Name" name="patientName" rules={[{ required: true, message: 'Required' }]} style={{ width: '50%' }}>
+                              <Input />
+                            </Form.Item>
+                            <Form.Item label="Patient Address (optional)" name="patientAddress" style={{ width: '50%' }}>
+                              <Input />
+                            </Form.Item>
+                          </Space.Compact>
+                          <Space.Compact style={{ width: '100%' }}>
+                            <Form.Item label="Doctor Name" name="doctorName" rules={[{ required: true, message: 'Required' }]} style={{ width: '50%' }}>
+                              <Input />
+                            </Form.Item>
+                            <Form.Item label="Doctor Registration No." name="doctorRegNo" rules={[{ required: true, message: 'Required' }]} style={{ width: '50%' }}>
+                              <Input />
+                            </Form.Item>
+                          </Space.Compact>
+                        </Card>
                       )}
 
-                      <Row gutter={[16, 16]}>
-                        <Col xs={24} md={12}>
-                          <Text strong style={{ display: 'block', marginBottom: 8 }}>Best Sellers (by quantity)</Text>
-                          <Table
-                            size="small"
-                            pagination={false}
-                            scroll={{ x: 'max-content' }}
-                            dataSource={analytics.topMedicinesByQuantity.map((m, i) => ({ ...m, key: i }))}
-                            columns={[
-                              { title: 'Medicine', dataIndex: 'name', key: 'name' },
-                              { title: 'Qty Sold', dataIndex: 'quantity', key: 'quantity' },
-                            ]}
-                          />
-                        </Col>
-                        <Col xs={24} md={12}>
-                          <Text strong style={{ display: 'block', marginBottom: 8 }}>Top Revenue Medicines</Text>
-                          <Table
-                            size="small"
-                            pagination={false}
-                            scroll={{ x: 'max-content' }}
-                            dataSource={analytics.topMedicinesByRevenue.map((m, i) => ({ ...m, key: i }))}
-                            columns={[
-                              { title: 'Medicine', dataIndex: 'name', key: 'name' },
-                              { title: 'Revenue', dataIndex: 'revenueCents', key: 'revenueCents', render: (v: number) => formatRs(v) },
-                            ]}
-                          />
-                        </Col>
-                      </Row>
-                    </>
-                  )}
-                </div>
-              ),
-            },
-          ] as { key: string; label: React.ReactNode; children: React.ReactNode }[]).filter(
-            (tab) => isOwner || !['reconciliation', 'analytics'].includes(tab.key),
-          )}
-        />
+                      <Card size="small" style={{ marginBottom: 16 }}>
+                        <StepHeading step={3}>How are they paying?</StepHeading>
+                        <Form.Item label="Payment Mode" name="paymentMode" rules={[{ required: true }]} initialValue="cash" style={{ marginBottom: watchedPaymentMode === 'credit' ? 12 : 0 }}>
+                          <Select options={PAYMENT_MODE_OPTIONS} />
+                        </Form.Item>
+
+                        {watchedPaymentMode === 'credit' && (
+                          <>
+                            {!watchedCustomerId && (
+                              <Alert type="error" showIcon message="A credit sale must be billed to a customer — select one above" style={{ marginBottom: 12 }} />
+                            )}
+                            <Form.Item
+                              label="Amount Paid Now (optional, rest becomes due)"
+                              name="amountPaidCents"
+                              extra={`Total is ${formatRs(previewTotals.total)} — leave blank if nothing is paid upfront`}
+                              style={{ marginBottom: 0 }}
+                            >
+                              <InputNumber min={0} max={previewTotals.total / 100} style={{ width: '100%' }} prefix="Rs." />
+                            </Form.Item>
+                          </>
+                        )}
+                      </Card>
+
+                      <Form.Item label="Note (optional)" name="note">
+                        <Input.TextArea rows={2} placeholder="Anything worth remembering about this sale" />
+                      </Form.Item>
+
+                      <Button
+                        type="primary"
+                        htmlType="submit"
+                        loading={saving}
+                        disabled={watchedPaymentMode === 'credit' && !watchedCustomerId}
+                        block
+                        size="large"
+                      >
+                        Complete Sale — {formatRs(previewTotals.total)}
+                      </Button>
+                    </Form>
+                  </div>
+                ),
+              },
+              {
+                key: 'sales',
+                label: <span><FileTextOutlined /> Sales History</span>,
+                children: (
+                  <div>
+                    <Space wrap style={{ marginBottom: 12 }}>
+                      <Input
+                        allowClear
+                        prefix={<SearchOutlined />}
+                        placeholder="Search invoice # or customer"
+                        style={{ width: 240 }}
+                        value={salesSearch}
+                        onChange={(e) => setSalesSearch(e.target.value)}
+                      />
+                      <Select
+                        allowClear
+                        placeholder="All payment modes"
+                        style={{ width: 180 }}
+                        value={salesPaymentFilter}
+                        onChange={setSalesPaymentFilter}
+                        options={PAYMENT_MODE_OPTIONS}
+                      />
+                    </Space>
+                    {filteredSales.length === 0 ? (
+                      <Empty description={sales.length === 0 ? 'No sales recorded yet' : 'No sales match your filters'} />
+                    ) : (
+                      <Table columns={saleColumns} dataSource={filteredSales.map((s) => ({ ...s, key: s.id }))} bordered size="middle" scroll={{ x: true }} />
+                    )}
+                  </div>
+                ),
+              },
+              {
+                key: 'customers',
+                label: <span><TeamOutlined /> Customers</span>,
+                children: (
+                  <div>
+                    <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 12 }} wrap>
+                      <Input
+                        allowClear
+                        prefix={<SearchOutlined />}
+                        placeholder="Search name or phone"
+                        style={{ width: 240 }}
+                        value={customerSearch}
+                        onChange={(e) => setCustomerSearch(e.target.value)}
+                      />
+                      <Button type="primary" icon={<PlusOutlined />} onClick={openCustomerForm}>
+                        New Customer
+                      </Button>
+                    </Space>
+                    <Table columns={customerColumns} dataSource={filteredCustomers.map((c) => ({ ...c, key: c.id }))} bordered size="middle" scroll={{ x: 'max-content' }} />
+                  </div>
+                ),
+              },
+              ...(isOwner ? [{
+                key: 'reports',
+                label: <span><BarChartOutlined /> Reports</span>,
+                children: (
+                  <div>
+                    <Segmented
+                      style={{ marginBottom: 20 }}
+                      value={reportView}
+                      onChange={(v) => setReportView(v as typeof reportView)}
+                      options={[
+                        { label: 'Daily Cash Reconciliation', value: 'reconciliation' },
+                        { label: 'Sales Analytics', value: 'analytics' },
+                        { label: 'Controlled Drug Register', value: 'h1-register' },
+                      ]}
+                    />
+
+                    {reportView === 'reconciliation' && (
+                      <div style={{ maxWidth: 480 }}>
+                        <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 12 }}>
+                          What you should have collected in cash/UPI/card today, and how much of that came from
+                          customers finally paying off old dues.
+                        </Text>
+                        <DatePicker
+                          value={reconDate}
+                          onChange={(d) => { const picked = d ?? dayjs(); setReconDate(picked); void fetchReconciliation(picked.format('YYYY-MM-DD')); }}
+                          style={{ marginBottom: 16 }}
+                        />
+                        {reconLoading ? (
+                          <Spin />
+                        ) : reconciliation ? (
+                          <>
+                            <Table
+                              pagination={false}
+                              bordered
+                              size="small"
+                              scroll={{ x: 'max-content' }}
+                              dataSource={PAYMENT_MODE_OPTIONS.map((m) => ({
+                                key: m.value,
+                                mode: m.label,
+                                count: reconciliation.byPaymentMode[m.value].count,
+                                total: reconciliation.byPaymentMode[m.value].totalCents,
+                              }))}
+                              columns={[
+                                { title: 'Payment Mode', dataIndex: 'mode', key: 'mode' },
+                                { title: 'Sales', dataIndex: 'count', key: 'count' },
+                                { title: 'Collected', dataIndex: 'total', key: 'total', render: (v: number) => formatRs(v) },
+                              ]}
+                            />
+                            <Descriptions column={1} size="small" style={{ marginTop: 16 }}>
+                              <Descriptions.Item label="Old dues settled today">{formatRs(reconciliation.creditCollectedTodayCents)}</Descriptions.Item>
+                              <Descriptions.Item label={<Text strong>Total cash/collections in hand today</Text>}>
+                                <Text strong style={{ fontSize: 16 }}>{formatRs(reconciliation.grandTotalCents)}</Text>
+                              </Descriptions.Item>
+                            </Descriptions>
+                          </>
+                        ) : (
+                          <Empty description="No data" />
+                        )}
+                      </div>
+                    )}
+
+                    {reportView === 'analytics' && (
+                      <div>
+                        <DatePicker.RangePicker
+                          value={analyticsRange}
+                          onChange={(range) => {
+                            if (!range || !range[0] || !range[1]) return;
+                            const picked: [Dayjs, Dayjs] = [range[0], range[1]];
+                            setAnalyticsRange(picked);
+                            void fetchAnalytics(picked[0].format('YYYY-MM-DD'), picked[1].format('YYYY-MM-DD'));
+                          }}
+                          style={{ marginBottom: 16 }}
+                        />
+                        {analyticsLoading ? (
+                          <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spin size="large" /></div>
+                        ) : !analytics ? (
+                          <Empty description="No data" />
+                        ) : (
+                          <>
+                            <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+                              <Col xs={24} sm={12} md={8}>
+                                <Card size="small"><Statistic title="Revenue" value={formatRs(analytics.totalRevenueCents)} /></Card>
+                              </Col>
+                              <Col xs={24} sm={12} md={8}>
+                                <Card size="small"><Statistic title="GST Collected" value={formatRs(analytics.totalGstCents)} /></Card>
+                              </Col>
+                              <Col xs={24} sm={12} md={8}>
+                                <Card size="small"><Statistic title="Invoices" value={analytics.saleCount} /></Card>
+                              </Col>
+                            </Row>
+
+                            <Text strong style={{ display: 'block', marginBottom: 8 }}>Revenue by Day</Text>
+                            {analytics.revenueByDay.length === 0 ? (
+                              <Empty description="No sales in this range" style={{ marginBottom: 24 }} />
+                            ) : (
+                              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 150, marginBottom: 24, overflowX: 'auto', padding: '0 4px' }}>
+                                {analytics.revenueByDay.map((d) => {
+                                  const maxRevenue = Math.max(...analytics.revenueByDay.map((x) => x.revenueCents), 1);
+                                  const heightPct = Math.max((d.revenueCents / maxRevenue) * 100, 4);
+                                  return (
+                                    <Tooltip key={d.date} title={`${dayjs(d.date).format('DD MMM')} — ${formatRs(d.revenueCents)} (${d.saleCount} sale${d.saleCount > 1 ? 's' : ''})`}>
+                                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 28, flexShrink: 0 }}>
+                                        <div style={{
+                                          width: 22, height: `${heightPct}%`, minHeight: 4, borderRadius: '4px 4px 2px 2px',
+                                          background: 'linear-gradient(180deg, #4096ff 0%, #1677ff 100%)',
+                                        }}
+                                        />
+                                        <Text style={{ fontSize: 9, marginTop: 4, whiteSpace: 'nowrap' }}>{dayjs(d.date).format('D MMM')}</Text>
+                                      </div>
+                                    </Tooltip>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            <Row gutter={[16, 16]}>
+                              <Col xs={24} md={12}>
+                                <Text strong style={{ display: 'block', marginBottom: 8 }}>Best Sellers (by quantity)</Text>
+                                <Table
+                                  size="small"
+                                  pagination={false}
+                                  scroll={{ x: 'max-content' }}
+                                  dataSource={analytics.topMedicinesByQuantity.map((m, i) => ({ ...m, key: i }))}
+                                  columns={[
+                                    { title: 'Medicine', dataIndex: 'name', key: 'name' },
+                                    { title: 'Qty Sold', dataIndex: 'quantity', key: 'quantity' },
+                                  ]}
+                                />
+                              </Col>
+                              <Col xs={24} md={12}>
+                                <Text strong style={{ display: 'block', marginBottom: 8 }}>Top Revenue Medicines</Text>
+                                <Table
+                                  size="small"
+                                  pagination={false}
+                                  scroll={{ x: 'max-content' }}
+                                  dataSource={analytics.topMedicinesByRevenue.map((m, i) => ({ ...m, key: i }))}
+                                  columns={[
+                                    { title: 'Medicine', dataIndex: 'name', key: 'name' },
+                                    { title: 'Revenue', dataIndex: 'revenueCents', key: 'revenueCents', render: (v: number) => formatRs(v) },
+                                  ]}
+                                />
+                              </Col>
+                            </Row>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {reportView === 'h1-register' && (
+                      <div>
+                        <Alert
+                          type="info"
+                          showIcon
+                          icon={<InfoCircleOutlined />}
+                          message="Schedule H1 register"
+                          description="Indian pharmacy law requires a record of every sale of a controlled/prescription medicine, with the patient and prescribing doctor's details — this is that record, built automatically from your sales."
+                          style={{ marginBottom: 16 }}
+                        />
+                        {h1Loading ? (
+                          <Spin />
+                        ) : h1Rows.length === 0 ? (
+                          <Empty description="No controlled-drug sales recorded yet" />
+                        ) : (
+                          <Table columns={h1Columns} dataSource={h1Rows.map((s) => ({ ...s, key: s.id }))} bordered size="small" scroll={{ x: true }} />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ),
+              }] : []),
+            ] as { key: string; label: React.ReactNode; children: React.ReactNode }[])}
+          />
+        </>
       )}
 
       <Modal
@@ -911,7 +1112,7 @@ export default function BillingPage() {
               <Descriptions.Item label="Subtotal">{formatRs(receiptSale.subtotalCents)}</Descriptions.Item>
               <Descriptions.Item label="GST">{formatRs(receiptSale.gstCents)}</Descriptions.Item>
               <Descriptions.Item label={<Text strong>Total</Text>}><Text strong>{formatRs(receiptSale.totalCents)}</Text></Descriptions.Item>
-              <Descriptions.Item label="Payment"><Tag>{receiptSale.paymentMode.toUpperCase()}</Tag></Descriptions.Item>
+              <Descriptions.Item label="Payment"><Tag color={PAYMENT_MODE_COLORS[receiptSale.paymentMode]}>{receiptSale.paymentMode.toUpperCase()}</Tag></Descriptions.Item>
               {receiptSale.paymentMode === 'credit' && (
                 <Descriptions.Item label="Amount due">{formatRs(receiptSale.totalCents - receiptSale.amountPaidCents)}</Descriptions.Item>
               )}
@@ -921,7 +1122,7 @@ export default function BillingPage() {
                 type="warning"
                 showIcon
                 style={{ marginTop: 12 }}
-                message="Schedule H1 register entry recorded"
+                message="Controlled Drug Register entry recorded"
                 description={`${receiptSale.controlledDrugInfo.patientName} · Dr. ${receiptSale.controlledDrugInfo.doctorName} (${receiptSale.controlledDrugInfo.doctorRegNo})`}
               />
             )}

@@ -4,11 +4,13 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   Table, Typography, Alert, Spin, Button, Space, message, Drawer, Modal, Form, Input, Badge, Popconfirm, theme,
   Tabs, Select, Checkbox, DatePicker, InputNumber, Switch, Tag, Card, Statistic, Row, Col, Empty, Divider, Radio,
+  Segmented, Popover,
 } from 'antd';
 import {
   PlusOutlined, TeamOutlined, StopOutlined, CheckCircleOutlined, UserOutlined, MailOutlined, LockOutlined,
-  CheckCircleFilled, CopyOutlined, SafetyCertificateOutlined, CalendarOutlined, FileDoneOutlined, DollarOutlined,
+  CheckCircleFilled, CopyOutlined, SafetyCertificateOutlined, CalendarOutlined, DollarOutlined,
   EditOutlined, DeleteOutlined, LoginOutlined, LogoutOutlined, DownloadOutlined, ClockCircleOutlined,
+  QuestionCircleOutlined, SolutionOutlined, ApartmentOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs, { Dayjs } from 'dayjs';
@@ -86,14 +88,34 @@ interface PayrollRecordRow {
   status: 'draft' | 'finalized' | 'paid'; paidVia?: string;
 }
 
+const statusTagAttendance = (s: AttendanceStatus) => {
+  const colorMap: Record<AttendanceStatus, string> = { present: 'green', absent: 'red', half_day: 'orange', leave: 'blue' };
+  return <Tag color={colorMap[s]}>{s.replace('_', ' ')}</Tag>;
+};
+const statusTagLeave = (s: LeaveStatus) => {
+  const colorMap: Record<LeaveStatus, string> = { pending: 'orange', approved: 'green', rejected: 'red', cancelled: 'default' };
+  return <Tag color={colorMap[s]}>{s}</Tag>;
+};
+const statusTagPayroll = (s: PayrollRecordRow['status']) => {
+  const colorMap = { draft: 'default', finalized: 'blue', paid: 'green' } as const;
+  return <Tag color={colorMap[s]}>{s}</Tag>;
+};
+
 export default function StaffPage() {
   const [me, setMe] = useState<{ id?: string; isOwner: boolean; permissions: string[] } | null>(null);
   const can = useCallback((perm: string) => !!me && (me.permissions.includes('*') || me.permissions.includes(perm)), [me]);
 
   useEffect(() => {
-    apiCall('GET', '/api/shop/me').then((res) => {
-      const data = res.data ?? res;
-      setMe({ isOwner: !!data.isOwner, permissions: data.permissions ?? [] });
+    Promise.all([
+      apiCall('GET', '/api/shop/me'),
+      // /api/shop/me returns shop profile info, not the caller's OWN user
+      // id — needed so "My Payslips" etc. can explicitly ask for their own
+      // records rather than relying on an ambiguous "no staffId" default.
+      apiCall('GET', '/api/auth/me').catch(() => null),
+    ]).then(([shopRes, authRes]) => {
+      const data = shopRes.data ?? shopRes;
+      const authData = authRes ? (authRes.data ?? authRes) : null;
+      setMe({ id: authData?.id, isOwner: !!data.isOwner, permissions: data.permissions ?? [] });
     }).catch(() => setMe({ isOwner: false, permissions: [] }));
   }, []);
 
@@ -137,7 +159,14 @@ export default function StaffPage() {
     if (me?.isOwner) { fetchRoles(); fetchPermissions(); }
   }, [fetchStaff, fetchRoles, fetchPermissions, me?.isOwner]);
 
-  const [activeTab, setActiveTab] = useState('staff');
+  const [activeTab, setActiveTab] = useState('attendance');
+  const [manageActiveTab, setManageActiveTab] = useState('staff');
+
+  const canManageAnything = !!me && (
+    me.isOwner || can('shop_attendance.manage') || can('shop_leave.manage')
+    || can('shop_payroll.manage') || can('shop_payroll.view')
+  );
+  const [workspace, setWorkspace] = useState<'my-work' | 'manage-team'>('my-work');
 
   return (
     <div>
@@ -145,63 +174,369 @@ export default function StaffPage() {
         <TeamOutlined style={{ marginRight: 8 }} />Staff
       </Title>
       <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
-        Staff accounts, custom roles &amp; permissions, attendance, leave, and payroll for your shop.
+        {canManageAnything
+          ? 'Your own attendance/leave/pay, or manage the whole team — accounts, roles, and payroll.'
+          : 'Check in and out, request leave, and see your own payslips.'}
       </Text>
 
       {!me ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spin size="large" /></div>
       ) : (
-        <Tabs
-          activeKey={activeTab}
-          onChange={setActiveTab}
-          items={[
-            {
-              key: 'staff',
-              label: <span><TeamOutlined /> Staff</span>,
-              children: (
-                <StaffTab
-                  me={me} staff={staff} loading={staffLoading} roles={roles}
-                  roleNameOf={roleNameOf} onChanged={fetchStaff}
-                />
-              ),
-            },
-            ...(me.isOwner ? [{
-              key: 'roles',
-              label: <span><SafetyCertificateOutlined /> Roles &amp; Permissions</span>,
-              children: (
-                <RolesTab roles={roles} permissions={permissions} onChanged={fetchRoles} />
-              ),
-            }] : []),
-            {
-              key: 'attendance',
-              label: <span><ClockCircleOutlined /> Attendance</span>,
-              children: (
-                <AttendanceTab me={me} can={can} staff={staff} staffNameOf={staffNameOf} />
-              ),
-            },
-            {
-              key: 'leave',
-              label: <span><CalendarOutlined /> Leave</span>,
-              children: (
-                <LeaveTab me={me} can={can} staff={staff} staffNameOf={staffNameOf} />
-              ),
-            },
-            {
-              key: 'payroll',
-              label: <span><DollarOutlined /> Payroll</span>,
-              children: (
-                <PayrollTab me={me} can={can} staff={staff} staffNameOf={staffNameOf} />
-              ),
-            },
-          ]}
-        />
+        <>
+          {canManageAnything && (
+            <Segmented
+              style={{ marginBottom: 20 }}
+              value={workspace}
+              onChange={(v) => setWorkspace(v as typeof workspace)}
+              options={[
+                { label: <span><SolutionOutlined style={{ marginRight: 6 }} />My Work</span>, value: 'my-work' },
+                { label: <span><ApartmentOutlined style={{ marginRight: 6 }} />Manage Team</span>, value: 'manage-team' },
+              ]}
+            />
+          )}
+
+          {workspace === 'my-work' || !canManageAnything ? (
+            <Tabs
+              activeKey={activeTab}
+              onChange={setActiveTab}
+              items={[
+                {
+                  key: 'attendance',
+                  label: <span><ClockCircleOutlined /> My Attendance</span>,
+                  children: <MyAttendanceTab />,
+                },
+                {
+                  key: 'leave',
+                  label: <span><CalendarOutlined /> My Leave</span>,
+                  children: <MyLeaveTab />,
+                },
+                {
+                  key: 'payroll',
+                  label: <span><DollarOutlined /> My Payslips</span>,
+                  children: <MyPayrollTab me={me} />,
+                },
+              ]}
+            />
+          ) : (
+            <Tabs
+              activeKey={manageActiveTab}
+              onChange={setManageActiveTab}
+              items={[
+                {
+                  key: 'staff',
+                  label: <span><TeamOutlined /> Staff</span>,
+                  children: (
+                    <StaffTab
+                      me={me} staff={staff} loading={staffLoading} roles={roles}
+                      roleNameOf={roleNameOf} onChanged={fetchStaff}
+                    />
+                  ),
+                },
+                ...(me.isOwner ? [{
+                  key: 'roles',
+                  label: <span><SafetyCertificateOutlined /> Roles &amp; Permissions</span>,
+                  children: (
+                    <RolesTab roles={roles} permissions={permissions} onChanged={fetchRoles} />
+                  ),
+                }] : []),
+                ...(me.isOwner || can('shop_attendance.manage') ? [{
+                  key: 'attendance',
+                  label: <span><ClockCircleOutlined /> Attendance</span>,
+                  children: (
+                    <AttendanceManageTab staff={staff} staffNameOf={staffNameOf} />
+                  ),
+                }] : []),
+                ...(me.isOwner || can('shop_leave.manage') ? [{
+                  key: 'leave',
+                  label: <span><CalendarOutlined /> Leave</span>,
+                  children: (
+                    <LeaveManageTab staff={staff} staffNameOf={staffNameOf} />
+                  ),
+                }] : []),
+                ...(me.isOwner || can('shop_payroll.view') || can('shop_payroll.manage') ? [{
+                  key: 'payroll',
+                  label: <span><DollarOutlined /> Payroll</span>,
+                  children: (
+                    <PayrollManageTab can={can} staff={staff} staffNameOf={staffNameOf} />
+                  ),
+                }] : []),
+              ]}
+            />
+          )}
+        </>
       )}
     </div>
   );
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// Tab 1 — Staff accounts
+// My Work — Attendance
+// ════════════════════════════════════════════════════════════════════════
+function MyAttendanceTab() {
+  const [today, setToday] = useState<AttendanceRow | null>(null);
+  const [selfLoading, setSelfLoading] = useState(false);
+  const fetchToday = useCallback(async () => {
+    try {
+      const result = await apiCall('GET', '/api/shop/attendance/me/today');
+      // 'data' can legitimately be null (no attendance marked yet today) —
+      // `result.data ?? result` would wrongly fall through to the whole
+      // response envelope in that case, so check the key's presence first.
+      const value = result && typeof result === 'object' && 'data' in result ? result.data : result;
+      setToday(value ?? null);
+    } catch { /* ignore */ }
+  }, []);
+  useEffect(() => { fetchToday(); }, [fetchToday]);
+
+  const checkIn = async () => {
+    setSelfLoading(true);
+    try {
+      await apiCall('POST', '/api/shop/attendance/check-in');
+      message.success('Checked in');
+      fetchToday();
+      fetchHistory();
+    } catch (err: unknown) { message.error(errMsg(err, 'Failed to check in')); }
+    finally { setSelfLoading(false); }
+  };
+  const checkOut = async () => {
+    setSelfLoading(true);
+    try {
+      await apiCall('POST', '/api/shop/attendance/check-out');
+      message.success('Checked out');
+      fetchToday();
+      fetchHistory();
+    } catch (err: unknown) { message.error(errMsg(err, 'Failed to check out')); }
+    finally { setSelfLoading(false); }
+  };
+
+  const [history, setHistory] = useState<AttendanceRow[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [range, setRange] = useState<[Dayjs, Dayjs]>([dayjs().startOf('month'), dayjs().endOf('month')]);
+  const fetchHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const params = new URLSearchParams({ from: range[0].format('YYYY-MM-DD'), to: range[1].format('YYYY-MM-DD') });
+      const result = await apiCall('GET', `/api/shop/attendance/me?${params.toString()}`);
+      setHistory(result.data ?? result);
+    } catch { /* ignore */ }
+    finally { setHistoryLoading(false); }
+  }, [range]);
+  useEffect(() => { fetchHistory(); }, [fetchHistory]);
+
+  const columns = [
+    { title: 'Date', dataIndex: 'date', key: 'date', render: (v: string) => dayjs(v).format('D MMM YYYY') },
+    { title: 'Status', dataIndex: 'status', key: 'status', render: statusTagAttendance },
+    { title: 'Check In', dataIndex: 'checkInAt', key: 'checkInAt', render: (v?: string) => v ? dayjs(v).format('HH:mm') : '—' },
+    { title: 'Check Out', dataIndex: 'checkOutAt', key: 'checkOutAt', render: (v?: string) => v ? dayjs(v).format('HH:mm') : '—' },
+    { title: 'Marked By', dataIndex: 'markedBy', key: 'markedBy', render: (v: string) => v === 'self' ? 'You' : 'Owner/Manager' },
+  ];
+
+  return (
+    <div>
+      <Card size="small" style={{ marginBottom: 20, maxWidth: 420 }}>
+        <Text strong style={{ display: 'block', marginBottom: 8 }}>Today — {dayjs().format('D MMM YYYY')}</Text>
+        {today ? (
+          <Space direction="vertical" size={4}>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Checked in {today.checkInAt ? dayjs(today.checkInAt).format('HH:mm') : '—'}
+              {today.checkOutAt ? ` · Checked out ${dayjs(today.checkOutAt).format('HH:mm')}` : ''}
+            </Text>
+            {statusTagAttendance(today.status)}
+          </Space>
+        ) : (
+          <Text type="secondary" style={{ fontSize: 12 }}>Not checked in yet today.</Text>
+        )}
+        <div style={{ marginTop: 12 }}>
+          <Space>
+            <Button type="primary" icon={<LoginOutlined />} loading={selfLoading} disabled={!!today?.checkInAt} onClick={checkIn}>
+              Check In
+            </Button>
+            <Button icon={<LogoutOutlined />} loading={selfLoading} disabled={!today?.checkInAt || !!today?.checkOutAt} onClick={checkOut}>
+              Check Out
+            </Button>
+          </Space>
+        </div>
+      </Card>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 12 }}>
+        <Text strong>My Recent Attendance</Text>
+        <RangePicker value={range} onChange={(v) => v && setRange(v as [Dayjs, Dayjs])} />
+      </div>
+      {historyLoading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spin size="large" /></div>
+      ) : history.length === 0 ? (
+        <Empty description="No attendance records for this range yet" />
+      ) : (
+        <Table columns={columns} dataSource={history.map((r) => ({ ...r, key: r.id }))} bordered size="middle" pagination={{ pageSize: 15 }} scroll={{ x: 'max-content' }} />
+      )}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// My Work — Leave
+// ════════════════════════════════════════════════════════════════════════
+function MyLeaveTab() {
+  const [balance, setBalance] = useState<LeaveBalance | null>(null);
+  const fetchBalance = useCallback(async () => {
+    try {
+      const result = await apiCall('GET', '/api/shop/leave/me/balance');
+      setBalance(result.data ?? result);
+    } catch { /* ignore */ }
+  }, []);
+  useEffect(() => { fetchBalance(); }, [fetchBalance]);
+
+  const [requests, setRequests] = useState<LeaveRequestRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const fetchRequests = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await apiCall('GET', '/api/shop/leave/me/requests');
+      setRequests(result.data ?? result);
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
+  }, []);
+  useEffect(() => { fetchRequests(); }, [fetchRequests]);
+
+  const [requestOpen, setRequestOpen] = useState(false);
+  const [requestForm] = Form.useForm<{ range: [Dayjs, Dayjs]; reason?: string }>();
+  const [requesting, setRequesting] = useState(false);
+  const submitRequest = async (values: { range: [Dayjs, Dayjs]; reason?: string }) => {
+    setRequesting(true);
+    try {
+      await apiCall('POST', '/api/shop/leave/requests', {
+        startDate: values.range[0].format('YYYY-MM-DD'),
+        endDate: values.range[1].format('YYYY-MM-DD'),
+        reason: values.reason,
+      });
+      message.success('Leave requested');
+      setRequestOpen(false);
+      fetchBalance();
+      fetchRequests();
+    } catch (err: unknown) { message.error(errMsg(err, 'Failed to request leave')); }
+    finally { setRequesting(false); }
+  };
+
+  const columns = [
+    { title: 'Dates', key: 'dates', render: (_: unknown, r: LeaveRequestRow) => `${r.startDate} → ${r.endDate}` },
+    { title: 'Days', dataIndex: 'days', key: 'days' },
+    { title: 'Reason', dataIndex: 'reason', key: 'reason', render: (v?: string) => v || '—' },
+    { title: 'Status', dataIndex: 'status', key: 'status', render: statusTagLeave },
+    { title: 'Paid?', dataIndex: 'isPaid', key: 'isPaid', render: (v: boolean, r: LeaveRequestRow) => r.status === 'approved' ? (v ? 'Paid' : 'Unpaid') : '—' },
+  ];
+
+  return (
+    <div>
+      <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
+        <Col xs={24} sm={12} md={8}>
+          <Card size="small">
+            <Statistic title="Annual Leave Quota" value={balance?.annualQuota ?? '—'} suffix="days" />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8}>
+          <Card size="small">
+            <Statistic title="Taken This Year (paid)" value={balance?.paidDaysTakenThisYear ?? '—'} suffix="days" />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8}>
+          <Card size="small">
+            <Statistic title="Remaining" value={balance?.remaining ?? '—'} suffix="days" styles={{ content: { color: '#3f8600' } }} />
+          </Card>
+        </Col>
+      </Row>
+
+      <div style={{ marginBottom: 16 }}>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => { requestForm.resetFields(); setRequestOpen(true); }}>
+          Request Leave
+        </Button>
+      </div>
+
+      <Text strong style={{ display: 'block', marginBottom: 12 }}>My Requests</Text>
+      {loading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spin size="large" /></div>
+      ) : requests.length === 0 ? (
+        <Empty description="No leave requests yet" />
+      ) : (
+        <Table columns={columns} dataSource={requests.map((r) => ({ ...r, key: r.id }))} bordered size="middle" pagination={{ pageSize: 15 }} scroll={{ x: 'max-content' }} />
+      )}
+
+      <Modal title="Request Leave" open={requestOpen} onCancel={() => setRequestOpen(false)} onOk={() => requestForm.submit()} confirmLoading={requesting}>
+        <Form form={requestForm} layout="vertical" onFinish={submitRequest}>
+          <Form.Item label="Dates" name="range" rules={[{ required: true, message: 'Pick a date range' }]}>
+            <RangePicker style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item label="Reason (optional)" name="reason">
+            <Input.TextArea rows={2} />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// My Work — Payslips
+// ════════════════════════════════════════════════════════════════════════
+function MyPayrollTab({ me }: { me: { id?: string; isOwner: boolean } }) {
+  const [myRecords, setMyRecords] = useState<PayrollRecordRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const fetchMyRecords = useCallback(async () => {
+    if (!me.id) { setLoading(false); return; }
+    setLoading(true);
+    try {
+      // Explicitly scoped to MY OWN id — omitting staffId here would make
+      // an owner/manager's call ambiguous with "give me everyone's
+      // records" on the backend, which is exactly the bug this fixes.
+      const result = await apiCall('GET', `/api/shop/payroll/records?staffId=${me.id}`);
+      setMyRecords(result.data ?? result);
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
+  }, [me.id]);
+  useEffect(() => { fetchMyRecords(); }, [fetchMyRecords]);
+
+  const downloadPayslip = async (record: PayrollRecordRow) => {
+    try {
+      await downloadFile(`/api/shop/payroll/records/${record.id}/payslip.pdf`, `payslip-${record.month}.pdf`);
+    } catch {
+      message.error('Failed to download payslip');
+    }
+  };
+
+  const columns = [
+    { title: 'Month', dataIndex: 'month', key: 'month' },
+    { title: 'Present Days', dataIndex: 'presentDays', key: 'presentDays' },
+    { title: 'Net Pay', key: 'net', render: (_: unknown, r: PayrollRecordRow) => <Text strong>{money(r.netPayCents)}</Text> },
+    { title: 'Status', dataIndex: 'status', key: 'status', render: statusTagPayroll },
+    {
+      title: '', key: 'actions',
+      render: (_: unknown, r: PayrollRecordRow) => (
+        <Button size="small" icon={<DownloadOutlined />} onClick={() => downloadPayslip(r)}>Payslip</Button>
+      ),
+    },
+  ];
+
+  return (
+    <div>
+      <Alert
+        type="info"
+        showIcon
+        icon={<QuestionCircleOutlined />}
+        message="How is my pay calculated?"
+        description="Your monthly salary is scaled to the days you actually worked that month (present + half-days ÷2 + approved paid leave, out of the month's total days) — then any bonuses are added and any deductions (PF/ESI/professional tax/TDS, if your shop uses them) are subtracted to get your net pay."
+        style={{ marginBottom: 20, maxWidth: 640 }}
+      />
+      {loading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spin size="large" /></div>
+      ) : myRecords.length === 0 ? (
+        <Empty description="No payslips yet — your shop generates these once a month closes" />
+      ) : (
+        <Table columns={columns} dataSource={myRecords.map((r) => ({ ...r, key: r.id }))} bordered size="middle" pagination={{ pageSize: 15 }} scroll={{ x: 'max-content' }} />
+      )}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// Manage Team — Staff accounts
 // ════════════════════════════════════════════════════════════════════════
 function StaffTab({
   me, staff, loading, roles, roleNameOf, onChanged,
@@ -427,7 +762,7 @@ function StaffTab({
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// Tab 2 — Roles & Permissions (owner only)
+// Manage Team — Roles & Permissions (owner only)
 // ════════════════════════════════════════════════════════════════════════
 function RolesTab({
   roles, permissions, onChanged,
@@ -579,58 +914,20 @@ function RolesTab({
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// Tab 3 — Attendance
+// Manage Team — Attendance
 // ════════════════════════════════════════════════════════════════════════
-function AttendanceTab({
-  me, can, staff, staffNameOf,
+function AttendanceManageTab({
+  staff, staffNameOf,
 }: {
-  me: { id?: string; isOwner: boolean };
-  can: (perm: string) => boolean;
   staff: StaffRow[];
   staffNameOf: (id: string) => string;
 }) {
-  const canManage = me.isOwner || can('shop_attendance.manage');
-
-  const [today, setToday] = useState<AttendanceRow | null>(null);
-  const [selfLoading, setSelfLoading] = useState(false);
-  const fetchToday = useCallback(async () => {
-    try {
-      const result = await apiCall('GET', '/api/shop/attendance/me/today');
-      // 'data' can legitimately be null (no attendance marked yet today) —
-      // `result.data ?? result` would wrongly fall through to the whole
-      // response envelope in that case, so check the key's presence first.
-      const value = result && typeof result === 'object' && 'data' in result ? result.data : result;
-      setToday(value ?? null);
-    } catch { /* ignore */ }
-  }, []);
-  useEffect(() => { fetchToday(); }, [fetchToday]);
-
-  const checkIn = async () => {
-    setSelfLoading(true);
-    try {
-      await apiCall('POST', '/api/shop/attendance/check-in');
-      message.success('Checked in');
-      fetchToday();
-    } catch (err: unknown) { message.error(errMsg(err, 'Failed to check in')); }
-    finally { setSelfLoading(false); }
-  };
-  const checkOut = async () => {
-    setSelfLoading(true);
-    try {
-      await apiCall('POST', '/api/shop/attendance/check-out');
-      message.success('Checked out');
-      fetchToday();
-    } catch (err: unknown) { message.error(errMsg(err, 'Failed to check out')); }
-    finally { setSelfLoading(false); }
-  };
-
   const [rows, setRows] = useState<AttendanceRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [filterStaff, setFilterStaff] = useState<string | undefined>(undefined);
   const [filterRange, setFilterRange] = useState<[Dayjs, Dayjs] | null>([dayjs().startOf('month'), dayjs().endOf('month')]);
 
   const fetchRows = useCallback(async () => {
-    if (!canManage) return;
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -643,7 +940,7 @@ function AttendanceTab({
       setRows(result.data ?? result);
     } catch (err: unknown) { message.error(errMsg(err, 'Failed to load attendance')); }
     finally { setLoading(false); }
-  }, [canManage, filterStaff, filterRange]);
+  }, [filterStaff, filterRange]);
   useEffect(() => { fetchRows(); }, [fetchRows]);
 
   const [markOpen, setMarkOpen] = useState(false);
@@ -662,17 +959,10 @@ function AttendanceTab({
     finally { setMarking(false); }
   };
 
-  const statusTag = (s: AttendanceStatus) => {
-    const colorMap: Record<AttendanceStatus, string> = {
-      present: 'green', absent: 'red', half_day: 'orange', leave: 'blue',
-    };
-    return <Tag color={colorMap[s]}>{s.replace('_', ' ')}</Tag>;
-  };
-
   const columns = [
     { title: 'Staff', key: 'staff', render: (_: unknown, r: AttendanceRow) => staffNameOf(r.staffUserId) },
     { title: 'Date', dataIndex: 'date', key: 'date' },
-    { title: 'Status', dataIndex: 'status', key: 'status', render: statusTag },
+    { title: 'Status', dataIndex: 'status', key: 'status', render: statusTagAttendance },
     { title: 'Check In', dataIndex: 'checkInAt', key: 'checkInAt', render: (v?: string) => v ? dayjs(v).format('HH:mm') : '—' },
     { title: 'Check Out', dataIndex: 'checkOutAt', key: 'checkOutAt', render: (v?: string) => v ? dayjs(v).format('HH:mm') : '—' },
     { title: 'Marked By', dataIndex: 'markedBy', key: 'markedBy', render: (v: string) => v === 'self' ? 'Self' : 'Owner/Manager' },
@@ -680,59 +970,29 @@ function AttendanceTab({
 
   return (
     <div>
-      <Card size="small" style={{ marginBottom: 20, maxWidth: 420 }}>
-        <Text strong style={{ display: 'block', marginBottom: 8 }}>My Attendance — Today ({dayjs().format('D MMM YYYY')})</Text>
-        {today ? (
-          <Space direction="vertical" size={4}>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              Checked in {today.checkInAt ? dayjs(today.checkInAt).format('HH:mm') : '—'}
-              {today.checkOutAt ? ` · Checked out ${dayjs(today.checkOutAt).format('HH:mm')}` : ''}
-            </Text>
-            {statusTag(today.status)}
-          </Space>
-        ) : (
-          <Text type="secondary" style={{ fontSize: 12 }}>Not checked in yet today.</Text>
-        )}
-        <div style={{ marginTop: 12 }}>
-          <Space>
-            <Button icon={<LoginOutlined />} loading={selfLoading} disabled={!!today?.checkInAt} onClick={checkIn}>
-              Check In
-            </Button>
-            <Button icon={<LogoutOutlined />} loading={selfLoading} disabled={!today?.checkInAt || !!today?.checkOutAt} onClick={checkOut}>
-              Check Out
-            </Button>
-          </Space>
-        </div>
-      </Card>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+        <Space wrap>
+          <Select
+            allowClear
+            placeholder="All staff"
+            style={{ width: 200 }}
+            value={filterStaff}
+            onChange={setFilterStaff}
+            options={staff.map((s) => ({ value: s.id, label: s.fullName || s.email }))}
+          />
+          <RangePicker value={filterRange} onChange={(v) => setFilterRange(v as [Dayjs, Dayjs] | null)} />
+        </Space>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => { markForm.resetFields(); setMarkOpen(true); }}>
+          Mark Attendance
+        </Button>
+      </div>
 
-      {canManage && (
-        <>
-          <Divider />
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
-            <Space wrap>
-              <Select
-                allowClear
-                placeholder="All staff"
-                style={{ width: 200 }}
-                value={filterStaff}
-                onChange={setFilterStaff}
-                options={staff.map((s) => ({ value: s.id, label: s.fullName || s.email }))}
-              />
-              <RangePicker value={filterRange} onChange={(v) => setFilterRange(v as [Dayjs, Dayjs] | null)} />
-            </Space>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => { markForm.resetFields(); setMarkOpen(true); }}>
-              Mark Attendance
-            </Button>
-          </div>
-
-          {loading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spin size="large" /></div>
-          ) : rows.length === 0 ? (
-            <Empty description="No attendance records for this range" />
-          ) : (
-            <Table columns={columns} dataSource={rows.map((r) => ({ ...r, key: r.id }))} bordered size="middle" pagination={{ pageSize: 15 }} scroll={{ x: 'max-content' }} />
-          )}
-        </>
+      {loading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spin size="large" /></div>
+      ) : rows.length === 0 ? (
+        <Empty description="No attendance records for this range" />
+      ) : (
+        <Table columns={columns} dataSource={rows.map((r) => ({ ...r, key: r.id }))} bordered size="middle" pagination={{ pageSize: 15 }} scroll={{ x: 'max-content' }} />
       )}
 
       <Modal
@@ -769,59 +1029,25 @@ function AttendanceTab({
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// Tab 4 — Leave
+// Manage Team — Leave
 // ════════════════════════════════════════════════════════════════════════
-function LeaveTab({
-  me, can, staff, staffNameOf,
+function LeaveManageTab({
+  staff, staffNameOf,
 }: {
-  me: { id?: string; isOwner: boolean };
-  can: (perm: string) => boolean;
   staff: StaffRow[];
   staffNameOf: (id: string) => string;
 }) {
-  const canManage = me.isOwner || can('shop_leave.manage');
-
-  const [balance, setBalance] = useState<LeaveBalance | null>(null);
-  const fetchBalance = useCallback(async () => {
-    try {
-      const result = await apiCall('GET', '/api/shop/leave/me/balance');
-      setBalance(result.data ?? result);
-    } catch { /* ignore */ }
-  }, []);
-  useEffect(() => { fetchBalance(); }, [fetchBalance]);
-
-  const [requestOpen, setRequestOpen] = useState(false);
-  const [requestForm] = Form.useForm<{ range: [Dayjs, Dayjs]; reason?: string }>();
-  const [requesting, setRequesting] = useState(false);
-
   const [requests, setRequests] = useState<LeaveRequestRow[]>([]);
   const [loading, setLoading] = useState(false);
   const fetchRequests = useCallback(async () => {
-    if (!canManage) return;
     setLoading(true);
     try {
       const result = await apiCall('GET', '/api/shop/leave/requests');
       setRequests(result.data ?? result);
     } catch (err: unknown) { message.error(errMsg(err, 'Failed to load leave requests')); }
     finally { setLoading(false); }
-  }, [canManage]);
+  }, []);
   useEffect(() => { fetchRequests(); }, [fetchRequests]);
-
-  const submitRequest = async (values: { range: [Dayjs, Dayjs]; reason?: string }) => {
-    setRequesting(true);
-    try {
-      await apiCall('POST', '/api/shop/leave/requests', {
-        startDate: values.range[0].format('YYYY-MM-DD'),
-        endDate: values.range[1].format('YYYY-MM-DD'),
-        reason: values.reason,
-      });
-      message.success('Leave requested');
-      setRequestOpen(false);
-      fetchBalance();
-      fetchRequests();
-    } catch (err: unknown) { message.error(errMsg(err, 'Failed to request leave')); }
-    finally { setRequesting(false); }
-  };
 
   const [decidingId, setDecidingId] = useState<string | null>(null);
   const decide = async (req: LeaveRequestRow, approve: boolean) => {
@@ -852,17 +1078,12 @@ function LeaveTab({
     finally { setMarking(false); }
   };
 
-  const statusTag = (s: LeaveStatus) => {
-    const colorMap: Record<LeaveStatus, string> = { pending: 'orange', approved: 'green', rejected: 'red', cancelled: 'default' };
-    return <Tag color={colorMap[s]}>{s}</Tag>;
-  };
-
   const columns = [
     { title: 'Staff', key: 'staff', render: (_: unknown, r: LeaveRequestRow) => staffNameOf(r.staffUserId) },
     { title: 'Dates', key: 'dates', render: (_: unknown, r: LeaveRequestRow) => `${r.startDate} → ${r.endDate}` },
     { title: 'Days', dataIndex: 'days', key: 'days' },
     { title: 'Reason', dataIndex: 'reason', key: 'reason', render: (v?: string) => v || '—' },
-    { title: 'Status', dataIndex: 'status', key: 'status', render: statusTag },
+    { title: 'Status', dataIndex: 'status', key: 'status', render: statusTagLeave },
     { title: 'Paid?', dataIndex: 'isPaid', key: 'isPaid', render: (v: boolean, r: LeaveRequestRow) => r.status === 'approved' ? (v ? 'Paid' : 'Unpaid') : '—' },
     {
       title: 'Actions', key: 'actions',
@@ -877,59 +1098,19 @@ function LeaveTab({
 
   return (
     <div>
-      <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
-        <Col xs={24} sm={12} md={8}>
-          <Card size="small">
-            <Statistic title="Annual Leave Quota" value={balance?.annualQuota ?? '—'} suffix="days" />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={8}>
-          <Card size="small">
-            <Statistic title="Taken This Year (paid)" value={balance?.paidDaysTakenThisYear ?? '—'} suffix="days" />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={8}>
-          <Card size="small">
-            <Statistic title="Remaining" value={balance?.remaining ?? '—'} suffix="days" styles={{ content: { color: '#3f8600' } }} />
-          </Card>
-        </Col>
-      </Row>
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
-        <Button icon={<PlusOutlined />} onClick={() => { requestForm.resetFields(); setRequestOpen(true); }}>
-          Request Leave
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => { markForm.resetFields(); setMarkOpen(true); }}>
+          Mark Leave for Staff
         </Button>
-        {canManage && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => { markForm.resetFields(); setMarkOpen(true); }}>
-            Mark Leave for Staff
-          </Button>
-        )}
       </div>
 
-      {canManage ? (
-        loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spin size="large" /></div>
-        ) : requests.length === 0 ? (
-          <Empty description="No leave requests yet" />
-        ) : (
-          <Table columns={columns} dataSource={requests.map((r) => ({ ...r, key: r.id }))} bordered size="middle" pagination={{ pageSize: 15 }} scroll={{ x: 'max-content' }} />
-        )
+      {loading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spin size="large" /></div>
+      ) : requests.length === 0 ? (
+        <Empty description="No leave requests yet" />
       ) : (
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          You can request leave above. Approving requests requires the &quot;Leave&quot; permission.
-        </Text>
+        <Table columns={columns} dataSource={requests.map((r) => ({ ...r, key: r.id }))} bordered size="middle" pagination={{ pageSize: 15 }} scroll={{ x: 'max-content' }} />
       )}
-
-      <Modal title="Request Leave" open={requestOpen} onCancel={() => setRequestOpen(false)} onOk={() => requestForm.submit()} confirmLoading={requesting}>
-        <Form form={requestForm} layout="vertical" onFinish={submitRequest}>
-          <Form.Item label="Dates" name="range" rules={[{ required: true, message: 'Pick a date range' }]}>
-            <RangePicker style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item label="Reason (optional)" name="reason">
-            <Input.TextArea rows={2} />
-          </Form.Item>
-        </Form>
-      </Modal>
 
       <Modal title="Mark Leave for Staff" open={markOpen} onCancel={() => setMarkOpen(false)} onOk={() => markForm.submit()} confirmLoading={marking}>
         <Form form={markForm} layout="vertical" onFinish={submitDirectMark}>
@@ -957,46 +1138,25 @@ function LeaveTab({
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// Tab 5 — Payroll
+// Manage Team — Payroll
 // ════════════════════════════════════════════════════════════════════════
-function PayrollTab({
-  me, can, staff, staffNameOf,
+function PayrollManageTab({
+  can, staff, staffNameOf,
 }: {
-  me: { id?: string; isOwner: boolean };
   can: (perm: string) => boolean;
   staff: StaffRow[];
   staffNameOf: (id: string) => string;
 }) {
-  const canManage = me.isOwner || can('shop_payroll.manage');
-  const canViewAll = me.isOwner || can('shop_payroll.view') || canManage;
+  const canManage = can('shop_payroll.manage') || can('*');
 
-  // ── My own payroll records (always visible to self) ──────────────────
-  const [myRecords, setMyRecords] = useState<PayrollRecordRow[]>([]);
-  const fetchMyRecords = useCallback(async () => {
-    try {
-      const result = await apiCall('GET', '/api/shop/payroll/records');
-      setMyRecords(result.data ?? result);
-    } catch { /* ignore */ }
-  }, []);
-  useEffect(() => { fetchMyRecords(); }, [fetchMyRecords]);
-
-  const downloadPayslip = async (record: PayrollRecordRow) => {
-    try {
-      await downloadFile(`/api/shop/payroll/records/${record.id}/payslip.pdf`, `payslip-${record.month}.pdf`);
-    } catch {
-      message.error('Failed to download payslip');
-    }
-  };
-
-  // ── Salary profiles (owner / shop_payroll.manage) ────────────────────
+  // ── Salary profiles ───────────────────────────────────────────────────
   const [profiles, setProfiles] = useState<StaffProfileRow[]>([]);
   const fetchProfiles = useCallback(async () => {
-    if (!canViewAll) return;
     try {
       const result = await apiCall('GET', '/api/shop/payroll/staff-profiles');
       setProfiles(result.data ?? result);
     } catch { /* ignore */ }
-  }, [canViewAll]);
+  }, []);
   useEffect(() => { fetchProfiles(); }, [fetchProfiles]);
 
   const [profileOpen, setProfileOpen] = useState(false);
@@ -1051,19 +1211,18 @@ function PayrollTab({
     finally { setSavingProfile(false); }
   };
 
-  // ── Payroll records for everyone (owner / shop_payroll.view+) ────────
+  // ── Payroll records for the whole team ────────────────────────────────
   const [allRecords, setAllRecords] = useState<PayrollRecordRow[]>([]);
   const [month, setMonth] = useState<Dayjs>(dayjs());
   const [loadingRecords, setLoadingRecords] = useState(false);
   const fetchAllRecords = useCallback(async () => {
-    if (!canViewAll) return;
     setLoadingRecords(true);
     try {
       const result = await apiCall('GET', `/api/shop/payroll/records?month=${month.format('YYYY-MM')}`);
       setAllRecords(result.data ?? result);
     } catch (err: unknown) { message.error(errMsg(err, 'Failed to load payroll records')); }
     finally { setLoadingRecords(false); }
-  }, [canViewAll, month]);
+  }, [month]);
   useEffect(() => { fetchAllRecords(); }, [fetchAllRecords]);
 
   const [generatingId, setGeneratingId] = useState<string | null>(null);
@@ -1090,7 +1249,6 @@ function PayrollTab({
       message.success('Adjustment added');
       setAdjustOpen(null);
       fetchAllRecords();
-      fetchMyRecords();
     } catch (err: unknown) { message.error(errMsg(err, 'Failed to add adjustment')); }
     finally { setAdjusting(false); }
   };
@@ -1115,9 +1273,12 @@ function PayrollTab({
     finally { setActingId(null); }
   };
 
-  const statusTag = (s: PayrollRecordRow['status']) => {
-    const colorMap = { draft: 'default', finalized: 'blue', paid: 'green' } as const;
-    return <Tag color={colorMap[s]}>{s}</Tag>;
+  const downloadPayslip = async (record: PayrollRecordRow) => {
+    try {
+      await downloadFile(`/api/shop/payroll/records/${record.id}/payslip.pdf`, `payslip-${record.month}.pdf`);
+    } catch {
+      message.error('Failed to download payslip');
+    }
   };
 
   const recordColumns = [
@@ -1127,7 +1288,7 @@ function PayrollTab({
     { title: 'Paid Leave', dataIndex: 'paidLeaveDays', key: 'paidLeaveDays' },
     { title: 'Gross', key: 'gross', render: (_: unknown, r: PayrollRecordRow) => money(r.proRatedGrossCents) },
     { title: 'Net Pay', key: 'net', render: (_: unknown, r: PayrollRecordRow) => <Text strong>{money(r.netPayCents)}</Text> },
-    { title: 'Status', dataIndex: 'status', key: 'status', render: statusTag },
+    { title: 'Status', dataIndex: 'status', key: 'status', render: statusTagPayroll },
     {
       title: 'Actions', key: 'actions',
       render: (_: unknown, r: PayrollRecordRow) => (
@@ -1147,88 +1308,80 @@ function PayrollTab({
     },
   ];
 
-  const myRecordColumns = [
-    { title: 'Month', dataIndex: 'month', key: 'month' },
-    { title: 'Net Pay', key: 'net', render: (_: unknown, r: PayrollRecordRow) => <Text strong>{money(r.netPayCents)}</Text> },
-    { title: 'Status', dataIndex: 'status', key: 'status', render: statusTag },
-    {
-      title: '', key: 'actions',
-      render: (_: unknown, r: PayrollRecordRow) => (
-        <Button size="small" icon={<DownloadOutlined />} onClick={() => downloadPayslip(r)}>Payslip</Button>
-      ),
-    },
-  ];
-
   return (
     <div>
-      <Card size="small" style={{ marginBottom: 24 }} title={<span><FileDoneOutlined style={{ marginRight: 6 }} />My Payslips</span>}>
-        {myRecords.length === 0 ? (
-          <Text type="secondary" style={{ fontSize: 12 }}>No payroll records yet.</Text>
-        ) : (
-          <Table columns={myRecordColumns} dataSource={myRecords.map((r) => ({ ...r, key: r.id }))} size="small" pagination={false} scroll={{ x: 'max-content' }} />
-        )}
-      </Card>
-
-      {canViewAll && (
-        <>
-          <Divider />
-          <Text strong style={{ display: 'block', marginBottom: 12 }}>Salary Profiles</Text>
-          <Table
-            size="small"
-            bordered
-            style={{ marginBottom: 24 }}
-            scroll={{ x: 'max-content' }}
-            dataSource={staff.filter((s) => s.shopStaffRole !== 'owner').map((s) => ({ ...s, key: s.id }))}
-            columns={[
-              { title: 'Staff', dataIndex: 'fullName', key: 'fullName', render: (v: string, s: StaffRow) => v || s.email },
-              {
-                title: 'Base Salary', key: 'salary',
-                render: (_: unknown, s: StaffRow) => {
-                  const p = profiles.find((pr) => pr.userId === s.id);
-                  return p ? money(p.monthlyBaseSalaryCents) + '/mo' : <Text type="secondary">Not set</Text>;
-                },
-              },
-              {
-                title: 'Mode', key: 'mode',
-                render: (_: unknown, s: StaffRow) => profiles.find((pr) => pr.userId === s.id)?.payrollMode ?? '—',
-              },
-              {
-                title: 'Actions', key: 'actions',
-                render: (_: unknown, s: StaffRow) => canManage && (
-                  <Button size="small" icon={<EditOutlined />} onClick={() => openProfile(s.id)}>Edit Salary</Button>
-                ),
-              },
-            ]}
-            pagination={false}
-          />
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
-            <Space>
-              <Text strong>Payroll Records —</Text>
-              <DatePicker picker="month" value={month} onChange={(v) => v && setMonth(v)} allowClear={false} />
-            </Space>
-            {canManage && (
-              <Select
-                placeholder="Generate for staff…"
-                style={{ width: 220 }}
-                value={undefined}
-                onChange={(staffId: string) => generate(staffId)}
-                options={staff.filter((s) => s.shopStaffRole !== 'owner').map((s) => ({
-                  value: s.id, label: s.fullName || s.email,
-                  disabled: generatingId === s.id,
-                }))}
-              />
-            )}
+      <Popover
+        placement="right"
+        content={(
+          <div style={{ maxWidth: 340, fontSize: 12 }}>
+            <Text style={{ fontSize: 12 }}>
+              Net pay = (base salary × days worked ÷ days in month) + bonuses − deductions (adjustments) − PF −
+              ESI − professional tax − TDS, if those are enabled on that staff member&apos;s salary profile.
+              &quot;Days worked&quot; counts present days fully, half-days as half, and approved paid leave fully.
+            </Text>
           </div>
+        )}
+      >
+        <Button type="link" icon={<QuestionCircleOutlined />} style={{ paddingLeft: 0, marginBottom: 12 }}>
+          How is net pay calculated?
+        </Button>
+      </Popover>
 
-          {loadingRecords ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spin size="large" /></div>
-          ) : allRecords.length === 0 ? (
-            <Empty description="No payroll records for this month yet" />
-          ) : (
-            <Table columns={recordColumns} dataSource={allRecords.map((r) => ({ ...r, key: r.id }))} bordered size="middle" scroll={{ x: 'max-content' }} />
-          )}
-        </>
+      <Text strong style={{ display: 'block', marginBottom: 12 }}>Salary Profiles</Text>
+      <Table
+        size="small"
+        bordered
+        style={{ marginBottom: 24 }}
+        scroll={{ x: 'max-content' }}
+        dataSource={staff.filter((s) => s.shopStaffRole !== 'owner').map((s) => ({ ...s, key: s.id }))}
+        columns={[
+          { title: 'Staff', dataIndex: 'fullName', key: 'fullName', render: (v: string, s: StaffRow) => v || s.email },
+          {
+            title: 'Base Salary', key: 'salary',
+            render: (_: unknown, s: StaffRow) => {
+              const p = profiles.find((pr) => pr.userId === s.id);
+              return p ? money(p.monthlyBaseSalaryCents) + '/mo' : <Text type="secondary">Not set</Text>;
+            },
+          },
+          {
+            title: 'Mode', key: 'mode',
+            render: (_: unknown, s: StaffRow) => profiles.find((pr) => pr.userId === s.id)?.payrollMode ?? '—',
+          },
+          {
+            title: 'Actions', key: 'actions',
+            render: (_: unknown, s: StaffRow) => canManage && (
+              <Button size="small" icon={<EditOutlined />} onClick={() => openProfile(s.id)}>Edit Salary</Button>
+            ),
+          },
+        ]}
+        pagination={false}
+      />
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+        <Space>
+          <Text strong>Payroll Records —</Text>
+          <DatePicker picker="month" value={month} onChange={(v) => v && setMonth(v)} allowClear={false} />
+        </Space>
+        {canManage && (
+          <Select
+            placeholder="Generate for staff…"
+            style={{ width: 220 }}
+            value={undefined}
+            onChange={(staffId: string) => generate(staffId)}
+            options={staff.filter((s) => s.shopStaffRole !== 'owner').map((s) => ({
+              value: s.id, label: s.fullName || s.email,
+              disabled: generatingId === s.id,
+            }))}
+          />
+        )}
+      </div>
+
+      {loadingRecords ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spin size="large" /></div>
+      ) : allRecords.length === 0 ? (
+        <Empty description="No payroll records for this month yet" />
+      ) : (
+        <Table columns={recordColumns} dataSource={allRecords.map((r) => ({ ...r, key: r.id }))} bordered size="middle" scroll={{ x: 'max-content' }} />
       )}
 
       <Modal

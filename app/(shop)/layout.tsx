@@ -237,8 +237,12 @@ function ShopLayoutInner({ children }: { children: React.ReactNode }) {
         >
           <ShopOutlined style={{ color: '#fff', fontSize: 16 }} />
         </div>
-        <div style={{ overflow: 'hidden' }}>
-          <Text strong style={{ fontSize: 14, display: 'block', lineHeight: 1.2, whiteSpace: 'nowrap' }}>
+        <div style={{ overflow: 'hidden', minWidth: 0 }}>
+          <Text
+            strong
+            title={shopName ?? undefined}
+            style={{ fontSize: 14, display: 'block', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+          >
             {shopName ?? 'Shop Portal'}
           </Text>
           {tenantName && (
