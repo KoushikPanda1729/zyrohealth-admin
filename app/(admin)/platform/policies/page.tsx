@@ -503,16 +503,21 @@ export default function PoliciesPage() {
         </Space>
       </Drawer>
 
-      <Modal
-        title={editing ? `Edit — ${editing.title}` : 'Edit Policy'}
+      <Drawer
+        title={<span><EditOutlined style={{ marginRight: 8, color: '#1677ff' }} />{editing ? `Edit — ${editing.title}` : 'Edit Policy'}</span>}
+        placement="right"
         open={!!editing}
-        onCancel={() => setEditing(null)}
-        onOk={saveEdit}
-        okText="Save"
-        confirmLoading={editSaving}
-        okButtonProps={{ disabled: !editTitle.trim() }}
-        width={960}
+        onClose={() => setEditing(null)}
+        size={960}
         destroyOnClose
+        footer={
+          <Space style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
+            <Button onClick={() => setEditing(null)}>Cancel</Button>
+            <Button type="primary" loading={editSaving} disabled={!editTitle.trim()} onClick={saveEdit}>
+              Save
+            </Button>
+          </Space>
+        }
       >
         {editing && (
           <Space direction="vertical" style={{ width: '100%' }} size="middle">
@@ -591,7 +596,7 @@ export default function PoliciesPage() {
             </Row>
           </Space>
         )}
-      </Modal>
+      </Drawer>
     </div>
   );
 }
