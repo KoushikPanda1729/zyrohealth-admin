@@ -30,9 +30,12 @@ export const FLOW_TEMPLATES: FlowTemplate[] = [
         n('start', 'start', 0, 0),
         n('menu', 'buttons', 0, 100, {
           text: 'Hi! 👋 Welcome to ZyroHealth. How can I help you today?',
+          // WhatsApp hard-caps quick-reply button titles at 20 characters
+          // and truncates silently (no ellipsis) past that — keep every
+          // label here at 20 chars or under.
           options: [
-            { id: 'order_medicine', label: 'Order Medicine (Upload Prescription)' },
-            { id: 'check_status', label: 'Check Order / Booking Status' },
+            { id: 'order_medicine', label: 'Order Medicine' },
+            { id: 'check_status', label: 'Check Status' },
             { id: 'talk_doctor', label: 'Talk to a Doctor' },
           ],
         }),
