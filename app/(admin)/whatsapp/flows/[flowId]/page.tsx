@@ -593,29 +593,50 @@ function NodeConfigForm({
 
     case 'buttons': {
       const options = data.options ?? [];
+      // WhatsApp hard-caps button text and silently truncates past the
+      // limit (no ellipsis, no warning on their end) — 20 chars for the
+      // inline quick-reply buttons used at 3 options or fewer, 24 for the
+      // scrollable list WhatsApp switches to above that. Surfacing the
+      // limit here is the only place an admin would ever find out before
+      // a patient sees a button cut off mid-word.
+      const labelLimit = options.length <= 3 ? 20 : 24;
       return (
         <Form layout="vertical">
           <Form.Item label="Prompt text">
             <TextArea rows={3} value={data.text} onChange={(e) => onChange({ text: e.target.value })} />
           </Form.Item>
           <Divider style={{ margin: '12px 0' }}>Options</Divider>
-          {options.map((o, i) => (
-            <Space key={o.id} style={{ display: 'flex', marginBottom: 8 }}>
-              <Input
-                value={o.label}
-                placeholder={`Option ${i + 1}`}
-                onChange={(e) => {
-                  const next = [...options];
-                  next[i] = { ...o, label: e.target.value };
-                  onChange({ options: next });
-                }}
-              />
-              <Button
-                danger size="small" icon={<DeleteOutlined />}
-                onClick={() => onChange({ options: options.filter((_, idx) => idx !== i) })}
-              />
-            </Space>
-          ))}
+          <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 8 }}>
+            WhatsApp cuts off button text past {labelLimit} characters (
+            {options.length <= 3 ? 'inline buttons' : 'list picker'}) — no ellipsis, just a hard stop mid-word.
+          </Text>
+          {options.map((o, i) => {
+            const over = o.label.length > labelLimit;
+            return (
+              <div key={o.id} style={{ marginBottom: 8 }}>
+                <Space style={{ display: 'flex' }}>
+                  <Input
+                    status={over ? 'warning' : undefined}
+                    value={o.label}
+                    placeholder={`Option ${i + 1}`}
+                    onChange={(e) => {
+                      const next = [...options];
+                      next[i] = { ...o, label: e.target.value };
+                      onChange({ options: next });
+                    }}
+                  />
+                  <Button
+                    danger size="small" icon={<DeleteOutlined />}
+                    onClick={() => onChange({ options: options.filter((_, idx) => idx !== i) })}
+                  />
+                </Space>
+                <Text type={over ? 'warning' : 'secondary'} style={{ fontSize: 11 }}>
+                  {o.label.length}/{labelLimit} characters
+                  {over ? ` — will be cut to "${o.label.slice(0, labelLimit)}" on WhatsApp` : ''}
+                </Text>
+              </div>
+            );
+          })}
           <Button
             icon={<PlusOutlined />} block
             onClick={() => onChange({ options: [...options, { id: nextId('opt'), label: '' }] })}

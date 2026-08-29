@@ -6,7 +6,7 @@ import {
 } from 'antd';
 import {
   EyeOutlined, WhatsAppOutlined, RobotOutlined, CustomerServiceOutlined, SendOutlined, ApartmentOutlined,
-  SettingOutlined, LockOutlined,
+  SettingOutlined, LockOutlined, FileTextOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
@@ -90,6 +90,9 @@ export default function WhatsAppPage() {
   const [gupshupWebhookSecret, setGupshupWebhookSecret] = useState('');
   const [hasGupshupApiKey, setHasGupshupApiKey] = useState(false);
   const [hasGupshupWebhookSecret, setHasGupshupWebhookSecret] = useState(false);
+  const [gupshupAppId, setGupshupAppId] = useState('');
+  const [otpTemplateName, setOtpTemplateName] = useState('');
+  const [otpTemplateLang, setOtpTemplateLang] = useState('');
   const [usingPlatformDefault, setUsingPlatformDefault] = useState(false);
 
   const fetchSessions = useCallback(async (page = 1) => {
@@ -175,6 +178,9 @@ export default function WhatsAppPage() {
       setHasGupshupWebhookSecret(!!cfg.hasGupshupWebhookSecret);
       setGupshupApiKey('');
       setGupshupWebhookSecret('');
+      setGupshupAppId(cfg.gupshupAppId ?? '');
+      setOtpTemplateName(cfg.otpTemplateName ?? '');
+      setOtpTemplateLang(cfg.otpTemplateLang ?? '');
       setUsingPlatformDefault(!!cfg.usingPlatformDefault);
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) message.error(err.response?.data?.message || 'Failed to load WhatsApp settings');
@@ -198,6 +204,9 @@ export default function WhatsAppPage() {
         gupshupSourceNumber: gupshupSourceNumber.trim() || undefined,
         gupshupAppName: gupshupAppName.trim() || undefined,
         gupshupWebhookSecret: gupshupWebhookSecret.trim() || undefined,
+        gupshupAppId: gupshupAppId.trim() || undefined,
+        otpTemplateName: otpTemplateName.trim() || undefined,
+        otpTemplateLang: otpTemplateLang.trim() || undefined,
       });
       message.success('WhatsApp settings saved');
       setSettingsOpen(false);
@@ -255,6 +264,9 @@ export default function WhatsAppPage() {
         </Title>
         <Space wrap>
           <Button icon={<SettingOutlined />} onClick={openSettings}>Provider Settings</Button>
+          <Button icon={<FileTextOutlined />} onClick={() => router.push('/whatsapp/templates')}>
+            Templates
+          </Button>
           <Button icon={<ApartmentOutlined />} onClick={() => router.push('/whatsapp/flows')}>
             Manage Flows
           </Button>
@@ -503,6 +515,19 @@ export default function WhatsAppPage() {
                   />
                 </div>
                 <div>
+                  <Text strong style={{ fontSize: 13 }}>App ID</Text>
+                  <Input
+                    value={gupshupAppId}
+                    onChange={(e) => setGupshupAppId(e.target.value)}
+                    placeholder="e.g. 0c8e3e38-026e-47b6-a01a-6e207e98b796"
+                    style={{ marginTop: 4 }}
+                  />
+                  <Text type="secondary" style={{ fontSize: 11 }}>
+                    The UUID shown on your Gupshup app&apos;s dashboard (different from App Name) — required
+                    for listing/creating Meta message templates.
+                  </Text>
+                </div>
+                <div>
                   <Text strong style={{ fontSize: 13 }}><LockOutlined style={{ marginRight: 4 }} />API Key</Text>
                   <Input.Password
                     value={gupshupApiKey}
@@ -527,6 +552,29 @@ export default function WhatsAppPage() {
                     <Text code style={{ fontSize: 11 }}> /api/whatsapp/webhook/gupshup/&lt;this-value&gt;</Text> when
                     you register the callback URL in Gupshup&apos;s console.
                   </Text>
+                </div>
+                <div>
+                  <Text strong style={{ fontSize: 13 }}>OTP Template Name (Meta template)</Text>
+                  <Input
+                    value={otpTemplateName}
+                    onChange={(e) => setOtpTemplateName(e.target.value)}
+                    placeholder="e.g. otp_verification"
+                    style={{ marginTop: 4 }}
+                  />
+                  <Text type="secondary" style={{ fontSize: 11 }}>
+                    An APPROVED Authentication-category template — see the Templates page. Once set, login
+                    OTPs are sent via this template instead of plain text, so they work even for a patient who
+                    has never messaged this number before.
+                  </Text>
+                </div>
+                <div>
+                  <Text strong style={{ fontSize: 13 }}>OTP Template Language</Text>
+                  <Input
+                    value={otpTemplateLang}
+                    onChange={(e) => setOtpTemplateLang(e.target.value)}
+                    placeholder="en"
+                    style={{ marginTop: 4 }}
+                  />
                 </div>
               </>
             )}
