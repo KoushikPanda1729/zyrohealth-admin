@@ -838,6 +838,21 @@ function NodeConfigForm({
         </Text>
       );
 
+    case 'search_medicine':
+      return (
+        <Text type="secondary">
+          No configuration needed. An alternative to Upload Prescription — the patient types a medicine name,
+          gets an AI-grounded answer checked against this tenant&apos;s own shop catalogs (never invents a
+          medicine/price/shop that isn&apos;t actually stocked), then taps a real WhatsApp button — &quot;Add to
+          Order&quot; or &quot;Search Again&quot; — to decide what happens next (typing &quot;add&quot; still
+          works too, for clients that don&apos;t render buttons). An order is always with a single shop — items
+          from a different shop can&apos;t be added to the same one. Tapping &quot;Checkout&quot; collects a
+          delivery address and places a real order (Cash on Delivery only for now), then advances via its one
+          outgoing edge — wire that to a Track Delivery node. Typing &quot;menu&quot; anywhere leaves without
+          ordering.
+        </Text>
+      );
+
     case 'await_shop_quotes':
       return (
         <Text type="secondary">

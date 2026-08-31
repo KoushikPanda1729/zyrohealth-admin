@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  Table, Typography, Alert, Spin, Tag, Button, Modal, message, Space, Select, Popconfirm, Timeline, Descriptions,
+  Table, Typography, Alert, Spin, Tag, Button, Modal, message, Space, Select, Timeline, Descriptions, Input,
 } from 'antd';
 import { EyeOutlined, MedicineBoxOutlined } from '@ant-design/icons';
 import axios from 'axios';
@@ -10,6 +10,16 @@ import { apiCall } from '../../../lib/api';
 import type { TablePaginationConfig } from 'antd';
 
 const { Title, Text } = Typography;
+const { TextArea } = Input;
+
+// The WhatsApp/chat checkout only ever collects one free-text reply for
+// the address — city/state/pincode get left as this literal placeholder
+// (see backend's createDirectCatalogOrder) rather than actually being
+// blank, so a naive falsy-check wouldn't catch it.
+const PLACEHOLDER = '—';
+function isRealValue(v: string | undefined): v is string {
+  return !!v && v !== PLACEHOLDER;
+}
 
 type OrderStatus =
   | 'placed' | 'confirmed' | 'packed' | 'picked_up' | 'out_for_delivery' | 'delivered' | 'cancelled';
@@ -75,6 +85,8 @@ export default function MedicineOrdersPage() {
   const [selected, setSelected] = useState<MedicineOrder | null>(null);
   const [nextStatus, setNextStatus] = useState<OrderStatus | undefined>(undefined);
   const [updating, setUpdating] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
 
   const fetchOrders = useCallback(async (page = 1) => {
     setLoading(true);
@@ -115,13 +127,18 @@ export default function MedicineOrdersPage() {
     } finally { setUpdating(false); }
   };
 
-  const cancelOrder = async () => {
-    if (!selected) return;
+  const confirmCancelOrder = async () => {
+    if (!selected || !cancelReason.trim()) return;
     setUpdating(true);
     try {
-      await apiCall('PATCH', `/api/admin/medicine-orders/${selected.id}/status`, { status: 'cancelled' });
-      message.success('Order cancelled');
+      await apiCall('PATCH', `/api/admin/medicine-orders/${selected.id}/status`, {
+        status: 'cancelled',
+        note: cancelReason.trim(),
+      });
+      message.success('Order cancelled — the patient has been notified');
       setSelected(null);
+      setCancelling(false);
+      setCancelReason('');
       fetchOrders(pagination.current);
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) message.error(err.response?.data?.message || 'Failed to cancel order');
@@ -225,9 +242,7 @@ export default function MedicineOrdersPage() {
                 </>
               )}
               {FORWARD_TRANSITIONS[selected.status].includes('cancelled') && (
-                <Popconfirm title="Cancel this order?" onConfirm={cancelOrder} okText="Cancel Order" okButtonProps={{ danger: true }}>
-                  <Button danger loading={updating}>Cancel Order</Button>
-                </Popconfirm>
+                <Button danger onClick={() => setCancelling(true)}>Cancel Order</Button>
               )}
               <Button onClick={() => setSelected(null)}>Close</Button>
             </Space>
@@ -241,8 +256,8 @@ export default function MedicineOrdersPage() {
                 {selected.patient?.fullName || selected.patient?.phoneNumber || '—'}
               </Descriptions.Item>
               <Descriptions.Item label="Delivery Address">
-                {selected.deliveryAddressLine1}
-                {selected.deliveryAddressLine2 ? `, ${selected.deliveryAddressLine2}` : ''}, {selected.deliveryCity}, {selected.deliveryState} {selected.deliveryPincode}
+                {[selected.deliveryAddressLine1, selected.deliveryAddressLine2, selected.deliveryCity, selected.deliveryState, selected.deliveryPincode]
+                  .filter(isRealValue).join(', ')}
               </Descriptions.Item>
               <Descriptions.Item label="Delivery Phone">{selected.deliveryPhone}</Descriptions.Item>
               <Descriptions.Item label="Total">{formatCents(selected.totalCents)}</Descriptions.Item>
@@ -272,6 +287,27 @@ export default function MedicineOrdersPage() {
             />
           </div>
         )}
+      </Modal>
+
+      <Modal
+        title="Cancel Order"
+        open={cancelling}
+        onCancel={() => { setCancelling(false); setCancelReason(''); }}
+        onOk={confirmCancelOrder}
+        okText="Cancel Order"
+        okButtonProps={{ danger: true, disabled: !cancelReason.trim() }}
+        confirmLoading={updating}
+      >
+        <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
+          The patient will be notified over WhatsApp with this reason.
+        </Text>
+        <TextArea
+          rows={3}
+          value={cancelReason}
+          onChange={(e) => setCancelReason(e.target.value)}
+          placeholder="e.g. Out of stock, unable to fulfil this order"
+          autoFocus
+        />
       </Modal>
     </div>
   );

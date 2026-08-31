@@ -38,6 +38,7 @@ interface CatalogItemRow {
   isControlledDrug: boolean;
   packSize?: number | null;
   subUnit?: string | null;
+  imageUrls?: string[];
   updatedAt: string;
 }
 
@@ -127,6 +128,7 @@ export default function ShopCatalogPage() {
   const [editing, setEditing] = useState<CatalogItemRow | null>(null);
   const [scannedNotice, setScannedNotice] = useState(false);
   const [scannedPackSize, setScannedPackSize] = useState<{ count: number; unit: string } | null>(null);
+  const [imageFileList, setImageFileList] = useState<UploadFile[]>([]);
   const [form] = Form.useForm<CatalogFormValues>();
 
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
@@ -185,6 +187,7 @@ export default function ShopCatalogPage() {
     setEditing(null);
     setScannedNotice(false);
     setScannedPackSize(null);
+    setImageFileList([]);
     form.resetFields();
     setDrawerOpen(true);
   };
@@ -194,6 +197,11 @@ export default function ShopCatalogPage() {
     setEditing(item);
     setScannedNotice(false);
     setScannedPackSize(null);
+    setImageFileList(
+      (item.imageUrls ?? []).map((url, i) => ({
+        uid: `existing-${i}`, name: `image-${i}`, status: 'done' as const, url,
+      })),
+    );
     form.setFieldsValue({
       name: item.name,
       price: item.priceCents / 100,
@@ -237,6 +245,10 @@ export default function ShopCatalogPage() {
       packSize: values.packSize ?? null,
       subUnit: values.subUnit?.trim() || null,
       isActive: values.isActive,
+      imageUrls: imageFileList
+        .filter((f) => f.status === 'done')
+        .map((f) => (f.response as { url?: string } | undefined)?.url ?? f.url)
+        .filter((u): u is string => !!u),
     };
     try {
       if (isCreate) {
@@ -334,6 +346,22 @@ export default function ShopCatalogPage() {
       options.onError?.(err as Error);
     } finally {
       setBulkUploading(false);
+    }
+  };
+
+  const uploadImage = async (options: { file: unknown; onSuccess?: (body: unknown) => void; onError?: (err: Error) => void }) => {
+    const fd = new FormData();
+    fd.append('files', options.file as File);
+    try {
+      const res = await api.post(`${env.API_URL}/api/shop/catalog/images`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const { urls } = (res.data.data ?? res.data) as { urls: string[] };
+      options.onSuccess?.({ url: urls[0] });
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) message.error(err.response?.data?.message || 'Failed to upload image');
+      else message.error('Failed to upload image');
+      options.onError?.(err as Error);
     }
   };
 
@@ -687,6 +715,27 @@ export default function ShopCatalogPage() {
           </Space.Compact>
           <Form.Item label="Manufacturer (optional)" name="manufacturer">
             <Input placeholder="e.g. Cipla" />
+          </Form.Item>
+          <Form.Item
+            label="Medicine Images (optional)"
+            help="Shown to patients browsing the Medicines catalog — up to 6 photos."
+          >
+            <Upload
+              listType="picture-card"
+              fileList={imageFileList}
+              customRequest={uploadImage}
+              onChange={({ fileList }) => setImageFileList(fileList)}
+              onRemove={(file) => setImageFileList((prev) => prev.filter((f) => f.uid !== file.uid))}
+              multiple
+              accept="image/*"
+            >
+              {imageFileList.length < 6 && (
+                <div>
+                  <PlusOutlined />
+                  <div style={{ marginTop: 8 }}>Upload</div>
+                </div>
+              )}
+            </Upload>
           </Form.Item>
           <Space.Compact style={{ width: '100%' }}>
             <Form.Item label="SKU / Barcode (optional)" name="sku" style={{ width: '50%' }}>

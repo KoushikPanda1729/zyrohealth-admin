@@ -10,7 +10,7 @@ import {
   MedicineBoxOutlined, TeamOutlined, CalendarOutlined,
   VideoCameraOutlined, DollarOutlined, CheckCircleOutlined, FileSearchOutlined,
   UploadOutlined, ClockCircleOutlined, ShopOutlined,
-  CreditCardOutlined, CarOutlined, ReloadOutlined,
+  CreditCardOutlined, CarOutlined, ReloadOutlined, SearchOutlined,
 } from '@ant-design/icons';
 
 export type FlowNodeType =
@@ -19,7 +19,7 @@ export type FlowNodeType =
   | 'platform_consultation_type' | 'platform_payment_method'
   | 'platform_create_booking' | 'platform_order_status' | 'platform_manage_booking'
   | 'upload_prescription' | 'await_shop_quotes' | 'select_quote'
-  | 'order_payment' | 'track_delivery';
+  | 'order_payment' | 'track_delivery' | 'search_medicine';
 
 export const PLATFORM_NODE_TYPES: FlowNodeType[] = [
   'platform_specialty_list', 'platform_doctor_list', 'platform_slot_list',
@@ -30,7 +30,7 @@ export const PLATFORM_NODE_TYPES: FlowNodeType[] = [
 // Same channel-agnostic node types run this over WhatsApp or the mobile
 // app — see whatsapp-flow-engine.service.ts's FlowSink abstraction.
 export const PRESCRIPTION_NODE_TYPES: FlowNodeType[] = [
-  'upload_prescription', 'await_shop_quotes', 'select_quote',
+  'upload_prescription', 'search_medicine', 'await_shop_quotes', 'select_quote',
   'order_payment', 'track_delivery',
 ];
 
@@ -71,6 +71,7 @@ export const NODE_META: Record<FlowNodeType, { color: string; icon: React.ReactN
   platform_order_status: { color: '#0d9488', icon: <FileSearchOutlined />, label: 'Order Status' },
   platform_manage_booking: { color: '#0d9488', icon: <ReloadOutlined />, label: 'Manage Booking' },
   upload_prescription: { color: '#7c3aed', icon: <UploadOutlined />, label: 'Upload Prescription' },
+  search_medicine: { color: '#7c3aed', icon: <SearchOutlined />, label: 'Search Medicine' },
   await_shop_quotes: { color: '#7c3aed', icon: <ClockCircleOutlined />, label: 'Await Quotes' },
   select_quote: { color: '#7c3aed', icon: <ShopOutlined />, label: 'Select Quote' },
   order_payment: { color: '#7c3aed', icon: <CreditCardOutlined />, label: 'Order Payment' },
@@ -100,6 +101,7 @@ export function summaryText(data: FlowNodeData): string {
     case 'platform_order_status': return "Looks up the patient's latest order/booking";
     case 'platform_manage_booking': return "Offers to cancel/reschedule the patient's upcoming booking (2hr cutoff)";
     case 'upload_prescription': return 'Asks for a prescription photo and creates the request';
+    case 'search_medicine': return 'Patient searches the catalog, adds items to an order, and checks out (COD only)';
     case 'await_shop_quotes': return 'Waits until a pharmacy quote is ready';
     case 'select_quote': return 'Shows quotes and lets the patient pick one';
     case 'order_payment': return 'Collects delivery address, creates the order, sends a payment link';

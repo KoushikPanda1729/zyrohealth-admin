@@ -39,7 +39,15 @@ export const FLOW_TEMPLATES: FlowTemplate[] = [
             { id: 'talk_doctor', label: 'Talk to a Doctor' },
           ],
         }),
+        n('order_medicine_choice', 'buttons', -300, 175, {
+          text: 'How would you like to order?',
+          options: [
+            { id: 'upload_rx', label: 'Upload Prescription' },
+            { id: 'search_med', label: 'Search Medicine' },
+          ],
+        }),
         n('upload', 'upload_prescription', -300, 250),
+        n('search_medicine', 'search_medicine', -500, 250),
         n('await_quotes', 'await_shop_quotes', -300, 350),
         n('select_quote', 'select_quote', -300, 450),
         n('order_payment', 'order_payment', -300, 550),
@@ -58,7 +66,10 @@ export const FLOW_TEMPLATES: FlowTemplate[] = [
       ],
       edges: [
         e('e1', 'start', 'menu'),
-        e('e2', 'menu', 'upload', 'order_medicine'),
+        e('e2', 'menu', 'order_medicine_choice', 'order_medicine'),
+        e('e21', 'order_medicine_choice', 'upload', 'upload_rx'),
+        e('e22', 'order_medicine_choice', 'search_medicine', 'search_med'),
+        e('e23', 'search_medicine', 'track_delivery'),
         e('e3', 'menu', 'order_status', 'check_status'),
         e('e4', 'menu', 'specialty_list', 'talk_doctor'),
         e('e5', 'upload', 'await_quotes'),
@@ -113,12 +124,19 @@ export const FLOW_TEMPLATES: FlowTemplate[] = [
     key: 'order-medicine-only',
     name: 'Order Medicine (Only)',
     description:
-      'Just the prescription marketplace, no menu — greets, asks for a prescription photo, waits for a pharmacy quote, lets the patient pick one, collects delivery/payment, then tracks delivery. Good for a pharmacy-only tenant.',
+      'Just the prescription marketplace, no main menu — greets and lets the patient upload a prescription photo OR type a medicine name to search the catalog, waits for a pharmacy quote, lets the patient pick one, collects delivery/payment, then tracks delivery. Good for a pharmacy-only tenant.',
     definition: {
       nodes: [
         n('start', 'start', 0, 0),
-        n('greet', 'message', 0, 100, { text: 'Hi! 👋 Send a photo of your prescription and we\'ll get you a quote.' }),
+        n('greet', 'buttons', 0, 100, {
+          text: 'Hi! 👋 How would you like to order?',
+          options: [
+            { id: 'upload_rx', label: 'Upload Prescription' },
+            { id: 'search_med', label: 'Search Medicine' },
+          ],
+        }),
         n('upload', 'upload_prescription', 0, 200),
+        n('search_medicine', 'search_medicine', -200, 200),
         n('await_quotes', 'await_shop_quotes', 0, 300),
         n('select_quote', 'select_quote', 0, 400),
         n('order_payment', 'order_payment', 0, 500),
@@ -127,7 +145,9 @@ export const FLOW_TEMPLATES: FlowTemplate[] = [
       ],
       edges: [
         e('e1', 'start', 'greet'),
-        e('e2', 'greet', 'upload'),
+        e('e2', 'greet', 'upload', 'upload_rx'),
+        e('e2b', 'greet', 'search_medicine', 'search_med'),
+        e('e2c', 'search_medicine', 'track_delivery'),
         e('e3', 'upload', 'await_quotes'),
         e('e4', 'await_quotes', 'select_quote'),
         e('e5', 'select_quote', 'order_payment'),
